@@ -39,6 +39,28 @@ def create_dkim_signature(domain: str, selector: str = "default") -> str:
     headers = ['from', 'to', 'subject', 'date', 'message-id']
     return f"v=1; a=rsa-sha256; d={domain}; s={selector}; h={':'.join(headers)}; bh=abc123; b=def456"
 
+def explain_smtp_error(exc: Exception) -> str:
+    """Smart error explanations from MailSpoof engine.py - tells users WHY it failed and how to fix."""
+    err = str(exc).lower()
+    msg = str(exc)
+
+    if any(x in err for x in ("tss09", "permanently deferred", "blacklist", "blocked", "rbl", "spamhaus", "barracuda")):
+        return "Your IP is blacklisted by the recipient's mail server. Use an external SMTP relay instead of direct MX delivery."
+    if any(x in err for x in ("connection refused", "connection reset", "timed out", "timeout")):
+        if "port 25" in err or "mx" in err:
+            return "Cannot connect to recipient MX server (port 25 blocked?). Use an external SMTP relay with authentication."
+        return f"Connection failed to SMTP server: {msg}. Check host/port and firewall."
+    if any(x in err for x in ("spf", "dkim", "dmarc", "domain", "policy")):
+        return "Domain policy rejected the email (SPF/DKIM/DMARC). Use an external SMTP relay that passes these checks."
+    if any(x in err for x in ("relay", "rejected", "550", "553", "554")):
+        return f"Mail server rejected the message: {msg}. Use an external SMTP relay with valid credentials."
+    if "auth" in err or "login" in err or "password" in err:
+        return f"Authentication failed: {msg}. Check username/password. For Gmail, use an App Password."
+    if "recipient" in err:
+        return f"Recipient refused: {msg}. Check the email address is valid."
+    return f"SMTP Error: {msg}"
+
+
 def add_senderpy_headers(msg: MIMEMultipart, domain: str, username: str, spoof_from: str = None):
     """Full sender.py authentication header injection for maximum deliverability."""
     # Message-ID
@@ -439,6 +461,9 @@ class SMTPSender:
                 return {"success": False, "error": f"Unexpected error: {type(e).__name__}: {str(e)}"}
 
         result = await loop.run_in_executor(None, _send)
+        # Add smart explanation if failed
+        if not result.get("success") and result.get("error"):
+            result["explanation"] = explain_smtp_error(Exception(result["error"]))
         return result
 
     async def _send_api(self, config: dict, email_data: dict, attachments: list = None) -> dict:

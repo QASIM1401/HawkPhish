@@ -9,9 +9,10 @@ from datetime import datetime
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
-from models import Campaign, EmailLog, Recipient, SMTPConfig, EmailTemplate, LandingPage, CredentialSubmit, Group, ProxyConfig
+from models import Campaign, EmailLog, Recipient, SMTPConfig, EmailTemplate, LandingPage, CredentialSubmit, Group, ProxyConfig, AuditLog
 from services.smtp_service import SMTPSender, validate_email
 from services.template_engine import TemplateEngine
+from services.audit_log_service import log_action
 import hashlib
 
 
@@ -45,6 +46,7 @@ class CampaignManager:
         self.db.add(campaign)
         await self.db.commit()
         await self.db.refresh(campaign)
+        await log_action(self.db, "campaign_created", "campaign", campaign.id, "system", {"name": campaign.name, "template_id": campaign.template_id, "group_id": campaign.group_id})
         return campaign
 
     async def start_campaign(self, campaign_id: int):
@@ -56,6 +58,7 @@ class CampaignManager:
         campaign.started_at = datetime.utcnow()
         await self.db.commit()
 
+        await log_action(self.db, "campaign_started", "campaign", campaign_id, "system", {"name": campaign.name})
         asyncio.create_task(self._process_campaign(campaign_id))
         return {"message": "Campaign started"}
 
@@ -66,6 +69,7 @@ class CampaignManager:
         campaign.status = "paused"
         await self.db.commit()
         self._running_campaigns.pop(campaign_id, None)
+        await log_action(self.db, "campaign_paused", "campaign", campaign_id, "system", {"name": campaign.name})
         return {"message": "Campaign paused"}
 
     async def cancel_campaign(self, campaign_id: int):
@@ -75,6 +79,7 @@ class CampaignManager:
         campaign.status = "cancelled"
         await self.db.commit()
         self._running_campaigns.pop(campaign_id, None)
+        await log_action(self.db, "campaign_cancelled", "campaign", campaign_id, "system", {"name": campaign.name})
         return {"message": "Campaign cancelled"}
 
     async def _process_campaign(self, campaign_id: int):

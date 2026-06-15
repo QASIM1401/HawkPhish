@@ -226,3 +226,16 @@ class CredentialSubmit(Base):
     submitted_at = Column(DateTime, default=datetime.utcnow)
     ip_address = Column(String(45))
     user_agent = Column(Text)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    action = Column(String(50), nullable=False)
+    entity_type = Column(String(50))
+    entity_id = Column(Integer)
+    user = Column(String(100))
+    details = Column(JSON, default=dict)
+    ip_address = Column(String(45))
+    success = Column(Boolean, default=True)

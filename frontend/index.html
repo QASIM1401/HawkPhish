@@ -71,6 +71,8 @@
                 <a href="#" onclick="showPage('groups')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-users w-5"></i>Groups</a>
                 <a href="#" onclick="showPage('smtp')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-envelope w-5"></i>SMTP Configs</a>
                 <a href="#" onclick="showPage('proxies')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-shield-halved w-5"></i>Proxies</a>
+                <a href="#" onclick="showPage('smtp-server')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-server w-5"></i>SMTP Server</a>
+                <a href="#" onclick="showPage('audit-logs')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-clipboard-list w-5"></i>Audit Logs</a>
                 <div class="border-t border-white/10 my-2"></div>
                 <a href="#" onclick="showPage('about')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-info-circle w-5"></i>About</a>
             </nav>
@@ -154,6 +156,8 @@
             case 'groups': return renderGroups(el);
             case 'smtp': return renderSMTP(el);
             case 'proxies': return renderProxies(el);
+            case 'smtp-server': return renderSMTPServer(el);
+            case 'audit-logs': return renderAuditLogs(el);
             case 'about': return renderAbout(el);
         }
     }
@@ -466,7 +470,10 @@
                 <div><h2 class="text-2xl md:text-3xl font-bold">Email Templates</h2><p class="text-gray-400 mt-1">Custom HTML emails — paste any design, full control</p></div>
                 <button onclick="showCreateTemplate()" class="btn-primary px-4 md:px-6 py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>New Template</button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <div class="mb-4">
+                <input id="tpl-filter" placeholder="Filter templates by name, category, tag..." class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm" oninput="filterTemplates()">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6" id="tpl-grid">
                 ${templates.map(t => `
                     <div class="glass rounded-xl p-6 hover:border-red-500/50 transition-all cursor-pointer" onclick="editTemplate(${t.id})">
                         <div class="flex items-center gap-3 mb-4">
@@ -487,7 +494,40 @@
                         </div>
                     </div>`).join('')}
                 ${templates.length === 0 ? '<div class="col-span-3 p-12 text-center text-gray-500"><i class="fas fa-file-code text-4xl mb-4"></i><p>No templates yet. Paste any HTML email design.</p></div>' : ''}
-            </div>`;
+            </div>
+            <script>
+                window._allTemplates = ${JSON.stringify(templates)};
+            </script>`;
+    }
+
+    function filterTemplates() {
+        const filter = document.getElementById('tpl-filter').value.toLowerCase();
+        const all = window._allTemplates || [];
+        const filtered = all.filter(t => {
+            const hay = (t.name + ' ' + t.category + ' ' + (t.severity || '') + ' ' + (t.tags || []).join(' ')).toLowerCase();
+            return hay.includes(filter);
+        });
+        const grid = document.getElementById('tpl-grid');
+        if (!grid) return;
+        grid.innerHTML = filtered.map(t => `
+            <div class="glass rounded-xl p-6 hover:border-red-500/50 transition-all cursor-pointer" onclick="editTemplate(${t.id})">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center"><i class="fas fa-file-code text-purple-400"></i></div>
+                    <div class="flex-1"><h3 class="font-semibold">${t.name}</h3>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-xs text-gray-400">${t.category}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full ${t.severity === 'Critical' ? 'bg-red-500/20 text-red-400' : t.severity === 'High' ? 'bg-orange-500/20 text-orange-400' : t.severity === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}">${t.severity}</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-400 mb-2">Subject: ${t.subject}</p>
+                <div class="flex flex-wrap gap-1 mb-2">${(t.tags || []).map(tag => `<span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded text-xs">${tag}</span>`).join('')}</div>
+                <div class="flex flex-wrap gap-1 mb-3">${(t.variables || []).map(v => `<span class="px-2 py-0.5 bg-white/10 rounded text-xs">##${v}##</span>`).join('')}</div>
+                <div class="flex gap-2">
+                    <button onclick="event.stopPropagation();editTemplate(${t.id})" class="text-sm px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-edit mr-1"></i>Edit</button>
+                    <button onclick="event.stopPropagation();deleteTemplate(${t.id})" class="text-sm px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"><i class="fas fa-trash mr-1"></i>Delete</button>
+                </div>
+            </div>`).join('') || '<div class="col-span-3 p-12 text-center text-gray-500"><i class="fas fa-file-code text-4xl mb-4"></i><p>No templates match your filter.</p></div>';
     }
 
     async function showCreateTemplate() {
@@ -1283,6 +1323,87 @@ mail.example.com:465:user1{Pass123
         showPage('smtp');
     }
 
+    // ========== SMTP SERVER ==========
+    async function renderSMTPServer(el) {
+        const status = (await api('/api/smtp-server/status')) || {running: false};
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">Built-in SMTP Server</h2><p class="text-gray-400 mt-1">Local SMTP relay for testing and direct MX delivery</p></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="glass rounded-xl p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-12 h-12 rounded-xl ${status.running ? 'bg-green-500/20' : 'bg-red-500/20'} flex items-center justify-center">
+                            <i class="fas fa-server ${status.running ? 'text-green-400' : 'text-red-400'} text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-lg">Server Status</h3>
+                            <p class="text-sm ${status.running ? 'text-green-400' : 'text-red-400'}">${status.running ? 'Running' : 'Stopped'}</p>
+                        </div>
+                    </div>
+                    ${status.running ? `
+                        <div class="space-y-2 text-sm text-gray-400">
+                            <div class="flex justify-between"><span>Host</span><span class="text-white font-mono">${status.host}</span></div>
+                            <div class="flex justify-between"><span>Port</span><span class="text-white font-mono">${status.port}</span></div>
+                            <div class="flex justify-between"><span>Connections</span><span class="text-white">${status.connections}</span></div>
+                            <div class="flex justify-between"><span>Emails Processed</span><span class="text-white">${status.emails_processed}</span></div>
+                        </div>
+                    ` : '<p class="text-sm text-gray-500">Server is not running. Start it below to begin local testing.</p>'}
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <h3 class="font-semibold mb-4">Control</h3>
+                    <div class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">Host</label>
+                                <input id="srv-host" value="0.0.0.0" class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">Port</label>
+                                <input id="srv-port" type="number" value="2525" class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="startSMTPServer()" class="flex-1 btn-success py-2.5 rounded-lg font-medium text-sm" ${status.running ? 'disabled style="opacity:0.5"' : ''}><i class="fas fa-play mr-2"></i>Start</button>
+                            <button onclick="stopSMTPServer()" class="flex-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 py-2.5 rounded-lg font-medium text-sm" ${!status.running ? 'disabled style="opacity:0.5"' : ''}><i class="fas fa-stop mr-2"></i>Stop</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="glass rounded-xl p-6">
+                <h3 class="font-semibold mb-4"><i class="fas fa-info-circle mr-2 text-blue-400"></i>About Built-in SMTP Server</h3>
+                <p class="text-sm text-gray-400 mb-3">This is a raw-socket SMTP server that can accept emails from other tools and relay them directly to recipient MX servers (direct MX delivery).</p>
+                <div class="space-y-2 text-sm text-gray-400">
+                    <p><strong class="text-white">Use case 1:</strong> Test your landing pages without needing an external SMTP provider.</p>
+                    <p><strong class="text-white">Use case 2:</strong> Use with other email tools that need an SMTP relay.</p>
+                    <p><strong class="text-white">Use case 3:</strong> Direct MX delivery to test deliverability (often blocked by ISPs).</p>
+                </div>
+                <div class="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                    <p class="text-xs text-yellow-400"><i class="fas fa-exclamation-triangle mr-2"></i><strong>Warning:</strong> Direct MX delivery from residential IPs is usually blocked by Gmail, Outlook, Yahoo, etc. For reliable delivery, use an external SMTP relay.</p>
+                </div>
+            </div>`;
+    }
+
+    async function startSMTPServer() {
+        const host = document.getElementById('srv-host').value;
+        const port = parseInt(document.getElementById('srv-port').value);
+        toast('Starting SMTP server...', 'info');
+        const r = await api('/api/smtp-server/start', 'POST', {host, port});
+        if (r.status === 'running') {
+            toast(`SMTP server running on ${host}:${port}`);
+        } else {
+            toast('Failed to start server', 'error');
+        }
+        showPage('smtp-server');
+    }
+
+    async function stopSMTPServer() {
+        toast('Stopping SMTP server...', 'info');
+        const r = await api('/api/smtp-server/stop', 'POST');
+        toast('SMTP server stopped');
+        showPage('smtp-server');
+    }
+
     // ========== PROXIES ==========
     async function renderProxies(el) {
         const proxies = (await api('/api/proxies')) || [];
@@ -1429,6 +1550,43 @@ socks4|proxy.example.com|1080||
             toast('No proxies parsed. Check the format.', 'error');
         }
         showPage('proxies');
+    }
+
+    // ========== AUDIT LOGS ==========
+    async function renderAuditLogs(el) {
+        const data = (await api('/api/audit-logs?limit=100')) || {logs: []};
+        const stats = (await api('/api/audit-logs/stats')) || {total: 0, success: 0, failed: 0, actions: {}};
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">Audit Logs</h2><p class="text-gray-400 mt-1">Track every action across the platform</p></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="glass rounded-xl p-4"><p class="text-gray-400 text-xs">Total Actions</p><p class="text-2xl font-bold mt-1">${stats.total}</p></div>
+                <div class="glass rounded-xl p-4"><p class="text-gray-400 text-xs">Successful</p><p class="text-2xl font-bold mt-1 text-green-400">${stats.success}</p></div>
+                <div class="glass rounded-xl p-4"><p class="text-gray-400 text-xs">Failed</p><p class="text-2xl font-bold mt-1 text-red-400">${stats.failed}</p></div>
+            </div>
+            <div class="glass rounded-xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-white/5 text-gray-400">
+                            <tr><th class="px-4 py-3 text-left">Timestamp</th><th class="px-4 py-3 text-left">Action</th><th class="px-4 py-3 text-left">Entity</th><th class="px-4 py-3 text-left">User</th><th class="px-4 py-3 text-left">Details</th><th class="px-4 py-3 text-left">Status</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            ${data.logs.map(log => `
+                                <tr class="hover:bg-white/5 transition-colors">
+                                    <td class="px-4 py-3 text-gray-400">${new Date(log.timestamp).toLocaleString()}</td>
+                                    <td class="px-4 py-3 font-medium">${log.action}</td>
+                                    <td class="px-4 py-3 text-gray-400">${log.entity_type || '-'} ${log.entity_id || ''}</td>
+                                    <td class="px-4 py-3 text-gray-400">${log.user || 'system'}</td>
+                                    <td class="px-4 py-3 text-xs text-gray-500">${JSON.stringify(log.details || {}).slice(0, 60)}</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full text-xs ${log.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${log.success ? 'Success' : 'Failed'}</span></td>
+                                </tr>
+                            `).join('')}
+                            ${data.logs.length === 0 ? '<tr><td colspan="6" class="px-4 py-12 text-center text-gray-500">No audit logs yet. Start creating campaigns to see actions logged.</td></tr>' : ''}
+                        </tbody>
+                    </table>
+                </div>
+            </div>`;
     }
 
     // ========== ABOUT ==========
