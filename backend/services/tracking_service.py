@@ -252,6 +252,7 @@ class TrackingService:
         return "/"
 
     async def record_credential(self, tracking_id: str, email: str, password: str,
+                                data: dict = None,
                                 user_agent: str = "", ip_address: str = "", language: str = "", referrer: str = ""):
         result = await self.db.execute(
             select(EmailLog).where(EmailLog.tracking_id == tracking_id)
@@ -280,6 +281,7 @@ class TrackingService:
             recipient_id=log.recipient_id,
             email=email,
             password=password,
+            data=data or {},
             ip_address=ip_address,
             user_agent=user_agent,
         )
@@ -295,11 +297,14 @@ class TrackingService:
             recipient = await self.db.get(Recipient, log.recipient_id)
 
         session = await self._get_or_create_session(log.campaign_id, log.recipient_id or 0, recipient.email if recipient else "")
-        event = _make_event("submit", {
+        event_data = {
             "ip": ip_address, "email": email, "browser": browser_info["browser"], "os": browser_info["os"],
             "device": browser_info["device"], "country": geo["country"], "city": geo["city"],
             "isp": geo["isp"],
-        })
+        }
+        if data:
+            event_data["extra"] = data
+        event = _make_event("submit", event_data)
         self._add_event_to_session(session, event, ip_address, geo, browser_info)
         session.status = "submitted"
 

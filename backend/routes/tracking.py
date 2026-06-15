@@ -1,6 +1,10 @@
-"""HawkPhish - Tracking, Sessions & Landing Page Routes"""
-from fastapi import APIRouter, Depends, Request, Form, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, Response
+"""HawkPhish - Tracking, Sessions & Landing Page Routes (Multi-file support)"""
+import os
+import re
+import mimetypes
+from pathlib import Path
+from fastapi import APIRouter, Depends, Request, Form, Query, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, Response, FileResponse, PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from database import get_db
@@ -10,6 +14,80 @@ from pydantic import BaseModel
 from typing import Optional
 
 router = APIRouter(tags=["Tracking"])
+
+# Base directory for landing page files (must match landing_pages.py)
+LP_BASE_DIR = Path(os.path.dirname(__file__)).parent / "landing_pages"
+
+
+def _lp_dir(page_id: int) -> Path:
+    return LP_BASE_DIR / str(page_id)
+
+
+def _inject_tracking(html: str, page_id: int, tracking_id: str) -> str:
+    """Inject tracking_id into all forms and rewrite relative links to preserve it."""
+    # Inject tracking_id into all forms
+    def _form_replacer(match):
+        form_tag = match.group(0)
+        if 'name="tracking_id"' in form_tag:
+            return form_tag
+        # Rewrite action to our submit endpoint
+        action_match = re.search(r'action=["\']([^"\']*)["\']', form_tag, re.IGNORECASE)
+        action = action_match.group(1) if action_match else ""
+        # If action is relative, empty, or not an external URL, set to our submit endpoint
+        if not action or not action.startswith("http"):
+            form_tag = re.sub(
+                r'action=["\'][^"\']*["\']',
+                f'action="/lp/{page_id}/submit"',
+                form_tag,
+                flags=re.IGNORECASE,
+                count=1
+            )
+        return form_tag + f'<input type="hidden" name="tracking_id" value="{tracking_id}">'
+
+    html = re.sub(r'<form\b[^>]*>', _form_replacer, html, flags=re.IGNORECASE)
+
+    # Rewrite relative links to append tracking_id
+    def _link_replacer(match):
+        href = match.group(1)
+        if href.startswith("http") or href.startswith("#") or href.startswith("javascript:") or href.startswith("mailto:"):
+            return match.group(0)
+        separator = "&" if "?" in href else "?"
+        return f'href="{href}{separator}tracking_id={tracking_id}"'
+
+    html = re.sub(r'href=["\']([^"\']*)["\']', _link_replacer, html)
+
+    # Inject script for JS-based tracking preservation
+    script = f"""<script>
+    window.__hawkphish_tracking_id = '{tracking_id}';
+    window.__hawkphish_page_id = {page_id};
+    (function() {{
+        var origFetch = window.fetch;
+        window.fetch = function(url, opts) {{
+            if (typeof url === 'string' && !url.includes('tracking_id')) {{
+                var sep = url.includes('?') ? '&' : '?';
+                url = url + sep + 'tracking_id=' + window.__hawkphish_tracking_id;
+            }}
+            return origFetch(url, opts);
+        }};
+        // Also intercept XMLHttpRequest
+        var origOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function(method, url) {{
+            if (typeof url === 'string' && !url.includes('tracking_id')) {{
+                var sep = url.includes('?') ? '&' : '?';
+                url = url + sep + 'tracking_id=' + window.__hawkphish_tracking_id;
+            }}
+            return origOpen.call(this, method, url);
+        }};
+    }})();
+</script>"""
+    if "</head>" in html:
+        html = html.replace("</head>", script + "</head>", 1)
+    elif "</body>" in html:
+        html = html.replace("</body>", script + "</body>", 1)
+    else:
+        html = html + script
+
+    return html
 
 
 @router.get("/pixel/{tracking_id}")
@@ -39,32 +117,99 @@ async def tracking_redirect(tracking_id: str, request: Request, db: AsyncSession
 
 
 @router.get("/lp/{landing_page_id}", response_class=HTMLResponse)
-async def show_landing_page(landing_page_id: int, tracking_id: str = "", db: AsyncSession = Depends(get_db)):
+async def show_landing_page(landing_page_id: int, request: Request, tracking_id: str = "", db: AsyncSession = Depends(get_db)):
     page = await db.get(LandingPage, landing_page_id)
     if not page:
         return HTMLResponse("<h1>Page not found</h1>", status_code=404)
 
-    html = page.html_content or ""
+    # Check if this is a multi-file landing page
+    lp_dir = _lp_dir(landing_page_id)
+    root_file = page.root_file or "index.html"
+    root_path = lp_dir / root_file
+
+    if root_path.exists():
+        html = root_path.read_text(encoding="utf-8")
+    else:
+        html = page.html_content or ""
+
+    if not html:
+        return HTMLResponse("<h1>Page not found</h1>", status_code=404)
+
+    # Inject tracking_id into forms and links
     if tracking_id:
-        html = html.replace("</form>", f'<input type="hidden" name="tracking_id" value="{tracking_id}"></form>')
+        html = _inject_tracking(html, landing_page_id, tracking_id)
 
     return HTMLResponse(html)
+
+
+@router.get("/lp/{landing_page_id}/{path:path}")
+async def serve_landing_page_file(
+    landing_page_id: int,
+    path: str,
+    request: Request,
+    tracking_id: str = "",
+    db: AsyncSession = Depends(get_db),
+):
+    """Serve static files (CSS, JS, images) for multi-file landing pages."""
+    page = await db.get(LandingPage, landing_page_id)
+    if not page:
+        raise HTTPException(404, "Landing page not found")
+
+    lp_dir = _lp_dir(landing_page_id)
+    file_path = lp_dir / path
+
+    # Security: prevent path traversal
+    try:
+        file_path.relative_to(lp_dir)
+    except ValueError:
+        raise HTTPException(400, "Invalid path")
+
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(404, "File not found")
+
+    # If it's an HTML file, inject tracking
+    content_type, _ = mimetypes.guess_type(str(file_path))
+    content_type = content_type or "application/octet-stream"
+
+    if content_type == "text/html" or file_path.suffix.lower() in (".html", ".htm"):
+        html = file_path.read_text(encoding="utf-8")
+        if tracking_id:
+            html = _inject_tracking(html, landing_page_id, tracking_id)
+        return HTMLResponse(html)
+
+    # For binary files (images, etc.)
+    if content_type.startswith("text/") or content_type in ("application/javascript", "application/json"):
+        return PlainTextResponse(file_path.read_text(encoding="utf-8"), media_type=content_type)
+    else:
+        return FileResponse(str(file_path), media_type=content_type)
 
 
 @router.post("/lp/{landing_page_id}/submit")
 async def submit_credentials(
     landing_page_id: int,
     request: Request,
-    tracking_id: str = Form(""),
-    email: str = Form(""),
-    password: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ):
+    """Capture credentials from landing page forms. Supports any form fields."""
+    # Parse form data dynamically
+    form = await request.form()
+    tracking_id = form.get("tracking_id", "")
+    email = form.get("email", "") or form.get("username", "") or form.get("user", "") or ""
+    password = form.get("password", "") or form.get("pass", "") or form.get("pwd", "") or ""
+
+    # Collect all extra fields as a dict
+    extra_data = {}
+    capture_fields = ["tracking_id", "email", "username", "user", "password", "pass", "pwd"]
+    for key, value in form.multi_items():
+        if key not in capture_fields and value:
+            extra_data[key] = value
+
     tracking = TrackingService(db)
     await tracking.record_credential(
         tracking_id=tracking_id,
         email=email,
         password=password,
+        data=extra_data,
         user_agent=request.headers.get("user-agent", ""),
         ip_address=request.client.host if request.client else "",
         language=request.headers.get("accept-language", ""),
@@ -73,7 +218,7 @@ async def submit_credentials(
 
     page = await db.get(LandingPage, landing_page_id)
     if page and page.redirect_url:
-        return RedirectResponse(url=page.redirect_url)
+        return RedirectResponse(url=page.redirect_url, status_code=302)
 
     return HTMLResponse("""
         <html><body style="font-family:sans-serif;text-align:center;padding:50px">
@@ -119,7 +264,6 @@ async def list_sessions(
 async def get_session(session_id: int, db: AsyncSession = Depends(get_db)):
     session = await db.get(RecipientSession, session_id)
     if not session:
-        from fastapi import HTTPException
         raise HTTPException(404, "Session not found")
 
     recipient = await db.get(Recipient, session.recipient_id) if session.recipient_id else None
@@ -196,12 +340,6 @@ async def dashboard(db: AsyncSession = Depends(get_db)):
 
     sessions_result = await db.execute(sel(func.count(RecipientSession.id)))
     total_sessions = sessions_result.scalar() or 0
-
-    unique_ips_result = await db.execute(
-        sel(func.count(func.distinct(RecipientSession.id))).where(
-            RecipientSession.ip_addresses.isnot(None)
-        )
-    )
 
     return {
         "campaigns": {

