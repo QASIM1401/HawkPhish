@@ -50,6 +50,30 @@ async def create_group(data: GroupCreate, db: AsyncSession = Depends(get_db)):
     return {"id": group.id, "message": "Group created"}
 
 
+@router.get("/{group_id}")
+async def get_group(group_id: int, db: AsyncSession = Depends(get_db)):
+    group = await db.get(Group, group_id)
+    if not group:
+        raise HTTPException(404, "Group not found")
+    count = await db.execute(select(Recipient).where(Recipient.group_id == group_id))
+    return {
+        "id": group.id, "name": group.name, "description": group.description,
+        "color": group.color, "recipient_count": len(count.scalars().all()),
+        "created_at": group.created_at.isoformat(),
+    }
+
+
+@router.put("/{group_id}")
+async def update_group(group_id: int, data: GroupCreate, db: AsyncSession = Depends(get_db)):
+    group = await db.get(Group, group_id)
+    if not group:
+        raise HTTPException(404, "Group not found")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(group, k, v)
+    await db.commit()
+    return {"message": "Group updated"}
+
+
 @router.delete("/{group_id}")
 async def delete_group(group_id: int, db: AsyncSession = Depends(get_db)):
     group = await db.get(Group, group_id)

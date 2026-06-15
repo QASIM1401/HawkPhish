@@ -53,6 +53,21 @@ async def create_smtp(data: SMTPCreate, db: AsyncSession = Depends(get_db)):
     return {"id": config.id, "message": "SMTP created"}
 
 
+@router.get("/{smtp_id}")
+async def get_smtp(smtp_id: int, db: AsyncSession = Depends(get_db)):
+    config = await db.get(SMTPConfig, smtp_id)
+    if not config:
+        raise HTTPException(404, "SMTP not found")
+    return {
+        "id": config.id, "name": config.name, "provider": config.provider,
+        "host": config.host, "port": config.port, "from_email": config.from_email,
+        "from_name": config.from_name, "max_emails": config.max_emails,
+        "emails_sent": config.emails_sent, "is_active": config.is_active,
+        "is_healthy": config.is_healthy, "last_health_check": config.last_health_check.isoformat() if config.last_health_check else None,
+        "profile_group": config.profile_group, "created_at": config.created_at.isoformat(),
+    }
+
+
 @router.put("/{smtp_id}")
 async def update_smtp(smtp_id: int, data: SMTPCreate, db: AsyncSession = Depends(get_db)):
     config = await db.get(SMTPConfig, smtp_id)
@@ -275,36 +290,78 @@ async def bulk_import_smtp(data: dict, db: AsyncSession = Depends(get_db)):
     if not raw:
         raise HTTPException(400, "No configs provided")
 
-    lines = raw.strip().split('\n')
-    # sender.py quality cleaning: validate, deduplicate, filter
-    cleaned, errors = clean_smtp_configs(lines)
     imported = 0
-    skipped = len(errors)
+    skipped = 0
+    errors = []
 
-    for item in cleaned:
-        parsed = _parse_smtp_line(item["line"])
-        if not parsed:
-            skipped += 1
-            errors.append(f"Could not parse: {item['line'][:50]}")
-            continue
+    if isinstance(raw, list):
+        # Handle list of dicts
+        for item in raw:
+            if isinstance(item, dict):
+                host = item.get("host", "")
+                port = item.get("port", 587)
+                username = item.get("username", "")
+                password = item.get("password", "")
+                if not all([host, username, password]):
+                    skipped += 1
+                    errors.append(f"Missing fields: {item}")
+                    continue
+                provider = _detect_provider(host)
+                name = item.get("name", f"{host.split('.')[0].title()} - {username[:20]}")
+                config = SMTPConfig(
+                    name=name,
+                    provider=provider,
+                    host=host,
+                    port=int(port),
+                    username=username,
+                    password=password,
+                    from_email=item.get("from_email", username),
+                    from_name=item.get("from_name", ""),
+                    use_tls=item.get("use_tls", True),
+                    max_emails=item.get("max_emails", 500),
+                )
+                db.add(config)
+                imported += 1
+            else:
+                # String in pipe format
+                parsed = _parse_smtp_line(item)
+                if not parsed:
+                    skipped += 1
+                    errors.append(f"Could not parse: {item[:50]}")
+                    continue
+                provider = _detect_provider(parsed["host"])
+                name = f"{parsed['host'].split('.')[0].title()} - {parsed['username'][:20]}"
+                config = SMTPConfig(
+                    name=name, provider=provider, host=parsed["host"],
+                    port=parsed["port"], username=parsed["username"],
+                    password=parsed["password"], from_email=parsed.get("from_email", parsed["username"]),
+                    from_name="", use_tls=parsed["use_tls"], max_emails=500,
+                )
+                db.add(config)
+                imported += 1
+    else:
+        # String format with newlines
+        lines = raw.strip().split('\n')
+        cleaned, errs = clean_smtp_configs(lines)
+        skipped += len(errs)
+        errors.extend(errs)
 
-        provider = _detect_provider(parsed["host"])
-        name = f"{parsed['host'].split('.')[0].title()} - {parsed['username'][:20]}"
-
-        config = SMTPConfig(
-            name=name,
-            provider=provider,
-            host=parsed["host"],
-            port=parsed["port"],
-            username=parsed["username"],
-            password=parsed["password"],
-            from_email=parsed.get("from_email", parsed["username"]),
-            from_name="",
-            use_tls=parsed["use_tls"],
-            max_emails=500,
-        )
-        db.add(config)
-        imported += 1
+        for item in cleaned:
+            parsed = _parse_smtp_line(item["line"])
+            if not parsed:
+                skipped += 1
+                errors.append(f"Could not parse: {item['line'][:50]}")
+                continue
+            provider = _detect_provider(parsed["host"])
+            name = f"{parsed['host'].split('.')[0].title()} - {parsed['username'][:20]}"
+            config = SMTPConfig(
+                name=name, provider=provider, host=parsed["host"],
+                port=parsed["port"], username=parsed["username"],
+                password=parsed["password"], from_email=parsed.get("from_email", parsed["username"]),
+                from_name="", use_tls=parsed["use_tls"], max_emails=500,
+            )
+            db.add(config)
+            imported += 1
 
     await db.commit()
     return {"imported": imported, "skipped": skipped, "errors": errors}

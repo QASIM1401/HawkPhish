@@ -59,8 +59,19 @@ class CampaignManager:
         await self.db.commit()
 
         await log_action(self.db, "campaign_started", "campaign", campaign_id, "system", {"name": campaign.name})
-        asyncio.create_task(self._process_campaign(campaign_id))
+        asyncio.create_task(self._process_campaign_background(campaign_id))
         return {"message": "Campaign started"}
+
+    async def _process_campaign_background(self, campaign_id: int):
+        """Run campaign processing with a fresh database session."""
+        from database import async_session
+        async with async_session() as db:
+            await self._process_campaign_with_db(campaign_id, db)
+
+    async def _process_campaign_with_db(self, campaign_id: int, db: AsyncSession):
+        """Process campaign using the provided database session."""
+        self.db = db
+        await self._process_campaign(campaign_id)
 
     async def pause_campaign(self, campaign_id: int):
         campaign = await self.db.get(Campaign, campaign_id)

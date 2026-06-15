@@ -164,10 +164,22 @@ async def delete_landing_page(page_id: int, db: AsyncSession = Depends(get_db)):
     page = await db.get(LandingPage, page_id)
     if not page:
         raise HTTPException(404, "Landing page not found")
-    # Delete files from disk
+    # Delete files from disk safely
     lp_dir = _lp_dir(page_id)
     if lp_dir.exists():
-        shutil.rmtree(lp_dir)
+        try:
+            shutil.rmtree(lp_dir)
+        except PermissionError:
+            for f in lp_dir.rglob("*"):
+                if f.is_file():
+                    try:
+                        f.unlink()
+                    except PermissionError:
+                        pass
+            try:
+                shutil.rmtree(lp_dir)
+            except Exception:
+                pass
     await db.delete(page)
     await db.commit()
     return {"message": "Landing page deleted"}
@@ -188,10 +200,23 @@ async def upload_landing_page_zip(
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(400, "Only ZIP files are allowed")
 
-    # Clean old files
+    # Clean old files safely (handle Windows permission issues)
     lp_dir = _lp_dir(page_id)
     if lp_dir.exists():
-        shutil.rmtree(lp_dir)
+        try:
+            shutil.rmtree(lp_dir)
+        except PermissionError:
+            # If deletion fails, clear files individually
+            for f in lp_dir.rglob("*"):
+                if f.is_file():
+                    try:
+                        f.unlink()
+                    except PermissionError:
+                        pass
+            try:
+                shutil.rmtree(lp_dir)
+            except Exception:
+                pass
     lp_dir.mkdir(parents=True, exist_ok=True)
 
     # Extract ZIP

@@ -64,6 +64,21 @@ async def get_campaign(campaign_id: int, db: AsyncSession = Depends(get_db)):
     return stats
 
 
+@router.put("/{campaign_id}")
+async def update_campaign(campaign_id: int, data: dict, db: AsyncSession = Depends(get_db)):
+    campaign = await db.get(Campaign, campaign_id)
+    if not campaign:
+        raise HTTPException(404, "Campaign not found")
+    if "status" in data:
+        campaign.status = data["status"]
+    if "name" in data:
+        campaign.name = data["name"]
+    if "settings" in data:
+        campaign.settings = data["settings"]
+    await db.commit()
+    return {"message": "Campaign updated"}
+
+
 @router.post("/{campaign_id}/start")
 async def start_campaign(campaign_id: int, db: AsyncSession = Depends(get_db)):
     manager = CampaignManager(db)
@@ -209,3 +224,13 @@ async def download_summary_pdf(db: AsyncSession = Depends(get_db)):
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=dashboard_summary.pdf"},
     )
+
+
+@router.delete("/{campaign_id}")
+async def delete_campaign(campaign_id: int, db: AsyncSession = Depends(get_db)):
+    campaign = await db.get(Campaign, campaign_id)
+    if not campaign:
+        raise HTTPException(404, "Campaign not found")
+    await db.delete(campaign)
+    await db.commit()
+    return {"message": "Campaign deleted"}
