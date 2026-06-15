@@ -10,7 +10,7 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
 from models import Campaign, EmailLog, Recipient, SMTPConfig, EmailTemplate, LandingPage, CredentialSubmit, Group, ProxyConfig
-from services.smtp_service import SMTPSender
+from services.smtp_service import SMTPSender, validate_email
 from services.template_engine import TemplateEngine
 import hashlib
 
@@ -125,6 +125,21 @@ class CampaignManager:
             if sent_count >= max_per_smtp:
                 break
 
+            # Validate recipient email
+            if not validate_email(recipient.email):
+                log = EmailLog(
+                    campaign_id=campaign_id,
+                    recipient_id=recipient.id,
+                    smtp_id=smtp.id,
+                    tracking_id="invalid",
+                    status="failed",
+                    error_message=f"Invalid email: {recipient.email}",
+                )
+                self.db.add(log)
+                campaign.total_failed += 1
+                await self.db.commit()
+                continue
+
             tracking_id = str(uuid.uuid4())[:16]
             landing_url = ""
             if landing_page:
@@ -160,8 +175,14 @@ class CampaignManager:
                 severity=current_template.severity or "Medium",
             )
 
+            # Replace inline variables in HTML body (sender.py pattern)
+            html_body = rendered["html_body"]
+            html_body = html_body.replace("##email##", recipient.email)
+            html_body = html_body.replace("##link##", f"{settings.get('base_url', 'http://localhost:8000')}/track/{tracking_id}")
+            html_body = html_body.replace("##date##", datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'))
+
             open_pixel = f'<img src="{settings.get("base_url", "http://localhost:8000")}/pixel/{tracking_id}" width="1" height="1" style="display:none" />'
-            html_body = rendered["html_body"] + open_pixel
+            html_body = html_body + open_pixel
 
             # Build custom headers
             headers = {
@@ -191,6 +212,8 @@ class CampaignManager:
                 "bcc": campaign.bcc,
                 "cc": campaign.cc,
                 "spoof_from": campaign.spoof_from,
+                "domain": smtp.from_email.split("@")[1] if "@" in smtp.from_email else "localhost",
+                "real_username": smtp.username or smtp.from_email,
             }
 
             log = EmailLog(

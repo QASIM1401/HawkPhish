@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database import get_db
 from models import SMTPConfig
-from services.smtp_service import SMTPHealthChecker, SMTPSender
+from services.smtp_service import SMTPHealthChecker, SMTPSender, clean_smtp_configs
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
@@ -276,18 +276,16 @@ async def bulk_import_smtp(data: dict, db: AsyncSession = Depends(get_db)):
         raise HTTPException(400, "No configs provided")
 
     lines = raw.strip().split('\n')
+    # sender.py quality cleaning: validate, deduplicate, filter
+    cleaned, errors = clean_smtp_configs(lines)
     imported = 0
-    skipped = 0
-    errors = []
+    skipped = len(errors)
 
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        parsed = _parse_smtp_line(line)
+    for item in cleaned:
+        parsed = _parse_smtp_line(item["line"])
         if not parsed:
             skipped += 1
-            errors.append(f"Could not parse: {line[:50]}")
+            errors.append(f"Could not parse: {item['line'][:50]}")
             continue
 
         provider = _detect_provider(parsed["host"])

