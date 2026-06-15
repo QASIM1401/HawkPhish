@@ -1,6 +1,6 @@
 <div align="center">
   <br>
-  <img src="assets/HawkPhish%20Logo.png" alt="HawkPhish Logo" width="180" style="border-radius: 24px; box-shadow: 0 0 40px rgba(233,69,96,0.25);">
+  <img src="frontend/assets/HawkPhish%20Logo.png" alt="HawkPhish Logo" width="180" style="border-radius: 24px; box-shadow: 0 0 40px rgba(233,69,96,0.25);">
   <br><br>
 
   <h1 align="center" style="font-weight: 800; letter-spacing: -1px;">HawkPhish</h1>
@@ -30,7 +30,7 @@
 
 <div align="center">
   <br>
-  <img src="assets/HawkPhishdashboard.png" alt="HawkPhish Dashboard" width="95%" style="border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);">
+  <img src="frontend/assets/HawkPhishdashboard.png" alt="HawkPhish Dashboard" width="95%" style="border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);">
   <br>
   <p><em>Real-time dashboard with campaign tracking, live feed, target sessions and resource overview.</em></p>
   <br>
