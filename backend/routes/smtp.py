@@ -21,6 +21,12 @@ class SMTPCreate(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     api_key: Optional[str] = None
+    api_secret: Optional[str] = None
+    domain: Optional[str] = None
+    region: Optional[str] = None
+    access_key: Optional[str] = None
+    secret_key: Optional[str] = None
+    server_id: Optional[str] = None
     from_email: str
     from_name: str = ""
     use_tls: bool = True
@@ -40,7 +46,8 @@ async def list_smtp(db: AsyncSession = Depends(get_db)):
         "from_name": c.from_name, "max_emails": c.max_emails,
         "emails_sent": c.emails_sent, "is_active": c.is_active,
         "is_healthy": c.is_healthy, "last_health_check": c.last_health_check.isoformat() if c.last_health_check else None,
-        "profile_group": c.profile_group, "created_at": c.created_at.isoformat(),
+        "profile_group": c.profile_group, "api_key": bool(c.api_key), "domain": c.domain,
+        "created_at": c.created_at.isoformat(),
     } for c in configs]
 
 
@@ -64,7 +71,9 @@ async def get_smtp(smtp_id: int, db: AsyncSession = Depends(get_db)):
         "from_name": config.from_name, "max_emails": config.max_emails,
         "emails_sent": config.emails_sent, "is_active": config.is_active,
         "is_healthy": config.is_healthy, "last_health_check": config.last_health_check.isoformat() if config.last_health_check else None,
-        "profile_group": config.profile_group, "created_at": config.created_at.isoformat(),
+        "profile_group": config.profile_group, "api_key": bool(config.api_key), "domain": config.domain,
+        "region": config.region, "access_key": bool(config.access_key), "server_id": config.server_id,
+        "created_at": config.created_at.isoformat(),
     }
 
 

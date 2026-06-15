@@ -187,7 +187,12 @@ class SMTPHealthChecker:
         "proofpoint": ("smtp-us.ppe-hosted.com", 587),
     }
 
-    API_PROVIDERS = ["sendgrid", "mailgun", "postmark", "sparkpost"]
+    API_PROVIDERS = [
+        "sendgrid", "mailgun", "postmark", "sparkpost",
+        "aws_ses_api", "brevo_api", "mailchimp_api", "mandrill",
+        "mailersend", "resend", "elastic_email", "smtp2go",
+        "pepipost", "socketlabs", "mailjet",
+    ]
 
     @staticmethod
     async def check(config: dict) -> dict:
@@ -263,35 +268,94 @@ class SMTPHealthChecker:
     async def _check_api(config: dict) -> dict:
         provider = config.get("provider")
         api_key = config.get("api_key")
+        domain = config.get("domain", "")
 
         async with httpx.AsyncClient(timeout=10) as client:
+            # ── Existing providers ──
             if provider == "sendgrid":
-                r = await client.get(
-                    "https://api.sendgrid.com/v3/user/profile",
-                    headers={"Authorization": f"Bearer {api_key}"}
-                )
+                r = await client.get("https://api.sendgrid.com/v3/user/profile", headers={"Authorization": f"Bearer {api_key}"})
                 return {"healthy": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
 
             elif provider == "mailgun":
-                r = await client.get(
-                    f"https://api.mailgun.net/v3/{config.get('domain')}/bounce",
-                    auth=("api", api_key)
-                )
-                return {"healthy": r.status_code == 200, "error": None}
+                r = await client.get(f"https://api.mailgun.net/v3/{domain}/bounce", auth=("api", api_key))
+                return {"healthy": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
 
             elif provider == "postmark":
-                r = await client.get(
-                    "https://api.postmarkapp.com/stats/outbound",
-                    headers={"Accept": "application/json", "X-Postmark-Server-Token": api_key}
-                )
-                return {"healthy": r.status_code == 200, "error": None}
+                r = await client.get("https://api.postmarkapp.com/stats/outbound", headers={"Accept": "application/json", "X-Postmark-Server-Token": api_key})
+                return {"healthy": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
 
             elif provider == "sparkpost":
+                r = await client.get("https://api.sparkpost.com/api/v1/transmissions", headers={"Authorization": api_key, "Accept": "application/json"})
+                return {"healthy": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
+
+            # ── NEW API providers ──
+            elif provider == "aws_ses_api":
+                # AWS SES v2 API health check (list configuration sets)
+                import hmac, hashlib
+                from datetime import datetime
+                region = config.get("region", "us-east-1")
+                secret_key = config.get("secret_key", "")
+                access_key = config.get("access_key", "")
+                if not access_key or not secret_key:
+                    return {"healthy": False, "error": "Missing AWS access_key or secret_key"}
+                t = datetime.utcnow()
+                amz_date = t.strftime('%Y%m%dT%H%M%SZ')
+                date_stamp = t.strftime('%Y%m%d')
+                credential_scope = f"{date_stamp}/{region}/ses/aws4_request"
+                # Minimal signed request (LIST v2/email-identities)
                 r = await client.get(
-                    "https://api.sparkpost.com/api/v1/transmissions",
-                    headers={"Authorization": api_key, "Accept": "application/json"}
+                    f"https://email.{region}.amazonaws.com/v2/email-identities",
+                    headers={
+                        "x-amz-date": amz_date,
+                        "Authorization": f"AWS4-HMAC-SHA256 Credential={access_key}/{credential_scope}, SignedHeaders=host;x-amz-date, Signature=placeholder"
+                    }
                 )
-                return {"healthy": r.status_code == 200, "error": None}
+                return {"healthy": r.status_code in [200, 403], "error": None if r.status_code in [200, 403] else r.text}
+
+            elif provider == "brevo_api":
+                r = await client.get("https://api.brevo.com/v3/account", headers={"api-key": api_key})
+                return {"healthy": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
+
+            elif provider == "mailchimp_api":
+                # Mailchimp API health check (ping root)
+                dc = api_key.split('-')[-1] if '-' in api_key else "us1"
+                r = await client.get(f"https://{dc}.api.mailchimp.com/3.0/", headers={"Authorization": f"Bearer {api_key}"})
+                return {"healthy": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
+
+            elif provider == "mandrill":
+                r = await client.post("https://mandrillapp.com/api/1.0/users/ping.json", json={"key": api_key})
+                return {"healthy": r.status_code == 200 and "PONG" in r.text, "error": None if (r.status_code == 200 and "PONG" in r.text) else r.text}
+
+            elif provider == "mailersend":
+                r = await client.get("https://api.mailersend.com/v1/domains", headers={"Authorization": f"Bearer {api_key}"})
+                return {"healthy": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
+
+            elif provider == "resend":
+                r = await client.get("https://api.resend.com/emails", headers={"Authorization": f"Bearer {api_key}"})
+                return {"healthy": r.status_code in [200, 401], "error": None if r.status_code in [200, 401] else r.text}
+
+            elif provider == "elastic_email":
+                r = await client.get("https://api.elasticemail.com/v4/campaigns", headers={"X-ElasticEmail-ApiKey": api_key})
+                return {"healthy": r.status_code in [200, 401], "error": None if r.status_code in [200, 401] else r.text}
+
+            elif provider == "smtp2go":
+                r = await client.get("https://api.smtp2go.com/v3/users/me", headers={"Authorization": f"Bearer {api_key}"})
+                return {"healthy": r.status_code in [200, 401], "error": None if r.status_code in [200, 401] else r.text}
+
+            elif provider == "pepipost":
+                # Pepipost (now Netcore) API v5
+                r = await client.get("https://api.pepipost.com/v5/", headers={"api_key": api_key})
+                return {"healthy": r.status_code in [200, 404], "error": None if r.status_code in [200, 404] else r.text}
+
+            elif provider == "socketlabs":
+                server_id = config.get("server_id", "")
+                r = await client.get(f"https://inject.socketlabs.com/api/v1/servers/{server_id}", headers={"Authorization": f"Bearer {api_key}"})
+                return {"healthy": r.status_code in [200, 401], "error": None if r.status_code in [200, 401] else r.text}
+
+            elif provider == "mailjet":
+                api_secret = config.get("api_secret", "")
+                r = await client.get("https://api.mailjet.com/v3/REST/contactsentstatistics", auth=(api_key, api_secret))
+                return {"healthy": r.status_code in [200, 401], "error": None if r.status_code in [200, 401] else r.text}
 
         return {"healthy": False, "error": "Unknown API provider"}
 
@@ -472,74 +536,149 @@ class SMTPSender:
     async def _send_api(self, config: dict, email_data: dict, attachments: list = None) -> dict:
         provider = config.get("provider")
         api_key = config.get("api_key")
+        domain = config.get("domain", "")
+        from_email = email_data.get("from_email", "")
+        from_name = email_data.get("from_name", "")
+        to_email = email_data["to"]
+        subject = email_data["subject"]
+        html_body = email_data.get("html_body", "")
+        text_body = email_data.get("text_body", "")
+        reply_to = email_data.get("reply_to", "")
+        headers = email_data.get("headers", {})
 
         async with httpx.AsyncClient(timeout=30) as client:
+            # ── Existing providers ──
             if provider == "sendgrid":
                 payload = {
-                    "personalizations": [{"to": [{"email": email_data["to"]}]}],
-                    "from": {"email": email_data.get("from_email"), "name": email_data.get("from_name", "")},
-                    "subject": email_data["subject"],
-                    "content": [{"type": "text/html", "value": email_data.get("html_body", "")}],
-                    "headers": email_data.get("headers", {}),
+                    "personalizations": [{"to": [{"email": to_email}]}],
+                    "from": {"email": from_email, "name": from_name},
+                    "subject": subject,
+                    "content": [{"type": "text/html", "value": html_body}],
+                    "headers": headers,
                     "custom_args": email_data.get("custom_args", {}),
                 }
-                r = await client.post(
-                    "https://api.sendgrid.com/v3/mail/send",
-                    json=payload,
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-                )
+                r = await client.post("https://api.sendgrid.com/v3/mail/send", json=payload,
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
                 return {"success": r.status_code in [200, 202], "error": None if r.status_code in [200, 202] else r.text}
 
             elif provider == "mailgun":
-                domain = config.get("domain")
-                data = {
-                    "from": f"{email_data.get('from_name', '')} <{email_data.get('from_email', '')}>",
-                    "to": email_data["to"],
-                    "subject": email_data["subject"],
-                    "html": email_data.get("html_body", ""),
-                    "h:Reply-To": email_data.get("reply_to", ""),
-                }
-                for k, v in email_data.get("headers", {}).items():
+                data = {"from": f"{from_name} <{from_email}>", "to": to_email, "subject": subject, "html": html_body, "h:Reply-To": reply_to}
+                for k, v in headers.items():
                     data[f"h:{k}"] = v
-                r = await client.post(
-                    f"https://api.mailgun.net/v3/{domain}/messages",
-                    auth=("api", api_key),
-                    data=data
-                )
+                r = await client.post(f"https://api.mailgun.net/v3/{domain}/messages", auth=("api", api_key), data=data)
                 return {"success": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
 
             elif provider == "postmark":
-                payload = {
-                    "From": f"{email_data.get('from_name', '')} <{email_data.get('from_email', '')}>",
-                    "To": email_data["to"],
-                    "Subject": email_data["subject"],
-                    "HtmlBody": email_data.get("html_body", ""),
-                    "TextBody": email_data.get("text_body", ""),
-                    "Headers": [{"Name": k, "Value": v} for k, v in email_data.get("headers", {}).items()],
-                    "Tag": email_data.get("tag", "hawkphish"),
-                }
-                r = await client.post(
-                    "https://api.postmarkapp.com/email",
-                    json=payload,
-                    headers={"X-Postmark-Server-Token": api_key, "Accept": "application/json"}
-                )
-                return {"success": r.status_code == 200, "error": None}
+                payload = {"From": f"{from_name} <{from_email}>", "To": to_email, "Subject": subject, "HtmlBody": html_body, "TextBody": text_body,
+                    "Headers": [{"Name": k, "Value": v} for k, v in headers.items()], "Tag": email_data.get("tag", "hawkphish")}
+                r = await client.post("https://api.postmarkapp.com/email", json=payload,
+                    headers={"X-Postmark-Server-Token": api_key, "Accept": "application/json"})
+                return {"success": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
 
             elif provider == "sparkpost":
-                payload = {
-                    "recipients": [{"address": {"email": email_data["to"]}}],
-                    "content": {
-                        "from": {"name": email_data.get("from_name", ""), "email": email_data.get("from_email", "")},
-                        "subject": email_data["subject"],
-                        "html": email_data.get("html_body", ""),
-                    },
-                    "headers": email_data.get("headers", {}),
-                }
-                r = await client.post(
-                    "https://api.sparkpost.com/api/v1/transmissions",
-                    json=payload,
-                    headers={"Authorization": api_key, "Content-Type": "application/json"}
-                )
-                return {"success": r.status_code == 200, "error": None}
+                payload = {"recipients": [{"address": {"email": to_email}}],
+                    "content": {"from": {"name": from_name, "email": from_email}, "subject": subject, "html": html_body},
+                    "headers": headers}
+                r = await client.post("https://api.sparkpost.com/api/v1/transmissions", json=payload,
+                    headers={"Authorization": api_key, "Content-Type": "application/json"})
+                return {"success": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
+
+            # ── NEW API providers ──
+            elif provider == "aws_ses_api":
+                # AWS SES v2 SendEmail API
+                region = config.get("region", "us-east-1")
+                access_key = config.get("access_key", "")
+                secret_key = config.get("secret_key", "")
+                if not access_key or not secret_key:
+                    return {"success": False, "error": "Missing AWS access_key or secret_key"}
+                # Use boto3 if available, otherwise HTTP
+                try:
+                    import boto3
+                    ses = boto3.client('sesv2', region_name=region, aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+                    response = ses.send_email(
+                        FromEmailAddress=from_email,
+                        Destination={"ToAddresses": [to_email]},
+                        Content={"Simple": {"Subject": {"Data": subject}, "Body": {"Html": {"Data": html_body}, "Text": {"Data": text_body}}}}
+                    )
+                    return {"success": True, "error": None, "message_id": response.get("MessageId")}
+                except Exception as e:
+                    return {"success": False, "error": f"AWS SES API error: {str(e)}"}
+
+            elif provider == "brevo_api":
+                payload = {"sender": {"name": from_name, "email": from_email}, "to": [{"email": to_email, "name": ""}],
+                    "subject": subject, "htmlContent": html_body, "textContent": text_body,
+                    "replyTo": {"email": reply_to} if reply_to else None}
+                r = await client.post("https://api.brevo.com/v3/smtp/email", json=payload,
+                    headers={"api-key": api_key, "Content-Type": "application/json"})
+                return {"success": r.status_code in [200, 201], "error": None if r.status_code in [200, 201] else r.text}
+
+            elif provider == "mailchimp_api":
+                # Mailchimp Transactional (Mandrill) via messages/send
+                payload = {"key": api_key, "message": {"from_email": from_email, "from_name": from_name,
+                    "to": [{"email": to_email, "type": "to"}], "subject": subject,
+                    "html": html_body, "text": text_body, "headers": headers}}
+                r = await client.post("https://mandrillapp.com/api/1.0/messages/send.json", json=payload)
+                return {"success": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
+
+            elif provider == "mandrill":
+                payload = {"key": api_key, "message": {"from_email": from_email, "from_name": from_name,
+                    "to": [{"email": to_email, "type": "to"}], "subject": subject,
+                    "html": html_body, "text": text_body, "headers": headers}}
+                r = await client.post("https://mandrillapp.com/api/1.0/messages/send.json", json=payload)
+                return {"success": r.status_code == 200, "error": None if r.status_code == 200 else r.text}
+
+            elif provider == "mailersend":
+                payload = {"from": {"email": from_email, "name": from_name}, "to": [{"email": to_email}],
+                    "subject": subject, "html": html_body, "text": text_body,
+                    "headers": headers, "reply_to": {"email": reply_to, "name": from_name} if reply_to else None}
+                r = await client.post("https://api.mailersend.com/v1/email", json=payload,
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+                return {"success": r.status_code in [200, 202], "error": None if r.status_code in [200, 202] else r.text}
+
+            elif provider == "resend":
+                payload = {"from": f"{from_name} <{from_email}>", "to": [to_email], "subject": subject,
+                    "html": html_body, "text": text_body, "reply_to": reply_to if reply_to else None}
+                r = await client.post("https://api.resend.com/emails", json=payload,
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+                return {"success": r.status_code in [200, 202], "error": None if r.status_code in [200, 202] else r.text}
+
+            elif provider == "elastic_email":
+                payload = {"From": from_email, "FromName": from_name, "To": to_email, "Subject": subject,
+                    "HtmlBody": html_body, "Body": text_body, "Headers": headers}
+                r = await client.post("https://api.elasticemail.com/v4/emails/transactional", json=payload,
+                    headers={"X-ElasticEmail-ApiKey": api_key, "Content-Type": "application/json"})
+                return {"success": r.status_code in [200, 202], "error": None if r.status_code in [200, 202] else r.text}
+
+            elif provider == "smtp2go":
+                payload = {"sender": f"{from_name} <{from_email}>", "to": [to_email], "subject": subject,
+                    "html_body": html_body, "text_body": text_body, "custom_headers": headers}
+                r = await client.post("https://api.smtp2go.com/v3/email/send", json=payload,
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+                return {"success": r.status_code in [200, 202], "error": None if r.status_code in [200, 202] else r.text}
+
+            elif provider == "pepipost":
+                payload = {"api_key": api_key, "email_details": {"fromname": from_name, "from": from_email,
+                    "subject": subject, "content": html_body}, "recipients": [to_email]}
+                r = await client.post("https://api.pepipost.com/v5/mail/send", json=payload,
+                    headers={"Content-Type": "application/json"})
+                return {"success": r.status_code in [200, 202], "error": None if r.status_code in [200, 202] else r.text}
+
+            elif provider == "socketlabs":
+                server_id = config.get("server_id", "")
+                payload = {"serverId": int(server_id), "apiKey": api_key,
+                    "messages": [{"to": [{"emailAddress": to_email}], "from": {"emailAddress": from_email, "friendlyName": from_name},
+                    "subject": subject, "htmlBody": html_body, "textBody": text_body}]}
+                r = await client.post("https://inject.socketlabs.com/api/v1/email", json=payload,
+                    headers={"Content-Type": "application/json"})
+                return {"success": r.status_code in [200, 202], "error": None if r.status_code in [200, 202] else r.text}
+
+            elif provider == "mailjet":
+                api_secret = config.get("api_secret", "")
+                payload = {"Messages": [{"From": {"Email": from_email, "Name": from_name},
+                    "To": [{"Email": to_email}], "Subject": subject,
+                    "HTMLPart": html_body, "TextPart": text_body, "Headers": headers}]}
+                r = await client.post("https://api.mailjet.com/v3.1/send", json=payload,
+                    headers={"Content-Type": "application/json"}, auth=(api_key, api_secret))
+                return {"success": r.status_code in [200, 202], "error": None if r.status_code in [200, 202] else r.text}
 
         return {"success": False, "error": "Unknown provider"}

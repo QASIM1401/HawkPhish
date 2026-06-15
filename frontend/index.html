@@ -1268,14 +1268,25 @@
         microsoft_365: { host: 'smtp.office365.com', port: 587, tls: true },
         sendgrid:  { host: 'smtp.sendgrid.net', port: 587, tls: true },
         aws_ses:   { host: 'email-smtp.us-east-1.amazonaws.com', port: 465, tls: false },
+        aws_ses_api: { host: 'api', port: 0, tls: true },
         mailgun:   { host: 'smtp.mailgun.org', port: 587, tls: true },
         postmark:  { host: 'smtp.postmarkapp.com', port: 587, tls: true },
         sparkpost: { host: 'smtp.sparkpostmail.com', port: 587, tls: true },
         mailchimp: { host: 'smtp.mailchimp.com', port: 587, tls: true },
+        mailchimp_api: { host: 'api', port: 0, tls: true },
+        mandrill:  { host: 'api', port: 0, tls: true },
+        brevo:     { host: 'smtp-relay.brevo.com', port: 587, tls: true },
+        brevo_api: { host: 'api', port: 0, tls: true },
         zoho:      { host: 'smtp.zoho.com', port: 587, tls: true },
         yandex:    { host: 'smtp.yandex.com', port: 465, tls: false },
         mailtrap:  { host: 'smtp.mailtrap.io', port: 587, tls: true },
-        brevo:     { host: 'smtp-relay.brevo.com', port: 587, tls: true },
+        mailersend: { host: 'api', port: 0, tls: true },
+        resend:    { host: 'api', port: 0, tls: true },
+        elastic_email: { host: 'api', port: 0, tls: true },
+        smtp2go:   { host: 'api', port: 0, tls: true },
+        pepipost:  { host: 'api', port: 0, tls: true },
+        socketlabs: { host: 'api', port: 0, tls: true },
+        mailjet:   { host: 'api', port: 0, tls: true },
         ionos:     { host: 'smtp.ionos.com', port: 587, tls: true },
         godaddy:   { host: 'smtpout.secureserver.net', port: 465, tls: false },
         namecheap: { host: 'mail.namecheap.com', port: 465, tls: false },
@@ -1290,6 +1301,14 @@
         document.getElementById('smtp-host').value = defaults.host;
         document.getElementById('smtp-port').value = defaults.port;
         document.getElementById('smtp-tls').value = defaults.tls ? 'true' : 'false';
+        // Show/hide API fields
+        const apiProviders = ['sendgrid','aws_ses_api','mailgun','postmark','sparkpost','mailchimp_api','mandrill','brevo_api','mailersend','resend','elastic_email','smtp2go','pepipost','socketlabs','mailjet'];
+        const apiFields = document.getElementById('api-fields');
+        if (apiProviders.includes(provider)) {
+            apiFields.classList.remove('hidden');
+        } else {
+            apiFields.classList.add('hidden');
+        }
     }
 
     function showCreateSMTP() {
@@ -1308,14 +1327,31 @@
                             <option value="gmail">Gmail</option>
                             <option value="google_workspace">Google Workspace</option>
                         </optgroup>
-                        <optgroup label="API Providers">
-                            <option value="sendgrid">SendGrid</option>
-                            <option value="aws_ses">Amazon SES</option>
-                            <option value="mailgun">Mailgun</option>
-                            <option value="postmark">Postmark</option>
-                            <option value="sparkpost">SparkPost</option>
-                            <option value="mailchimp">Mailchimp</option>
-                            <option value="brevo">Brevo (Sendinblue)</option>
+                        <optgroup label="API Providers (HTTP)" style="background:#1a3a1a">
+                            <option value="sendgrid">SendGrid API</option>
+                            <option value="aws_ses_api">Amazon SES API</option>
+                            <option value="mailgun">Mailgun API</option>
+                            <option value="postmark">Postmark API</option>
+                            <option value="sparkpost">SparkPost API</option>
+                            <option value="mailchimp_api">Mailchimp API</option>
+                            <option value="mandrill">Mandrill API</option>
+                            <option value="brevo_api">Brevo API</option>
+                            <option value="mailersend">MailerSend API</option>
+                            <option value="resend">Resend API</option>
+                            <option value="elastic_email">Elastic Email API</option>
+                            <option value="smtp2go">SMTP2GO API</option>
+                            <option value="pepipost">Pepipost (Netcore) API</option>
+                            <option value="socketlabs">SocketLabs API</option>
+                            <option value="mailjet">Mailjet API</option>
+                        </optgroup>
+                        <optgroup label="SMTP Relay Providers">
+                            <option value="aws_ses">Amazon SES (SMTP)</option>
+                            <option value="mailchimp">Mailchimp (SMTP)</option>
+                            <option value="brevo">Brevo (SMTP)</option>
+                            <option value="mailgun">Mailgun (SMTP)</option>
+                            <option value="sendgrid">SendGrid (SMTP)</option>
+                            <option value="postmark">Postmark (SMTP)</option>
+                            <option value="sparkpost">SparkPost (SMTP)</option>
                         </optgroup>
                         <optgroup label="Webmail">
                             <option value="zoho">Zoho Mail</option>
@@ -1343,7 +1379,16 @@
                         </select></div>
                 </div>
                 <input id="smtp-username" placeholder="Username / Email" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
-                <input id="smtp-password" type="password" placeholder="Password" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <input id="smtp-password" type="password" placeholder="Password / API Key" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <div id="api-fields" class="space-y-3 hidden">
+                    <input id="smtp-api-key" placeholder="API Key (for API providers)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                    <input id="smtp-api-secret" placeholder="API Secret (Mailjet only)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                    <input id="smtp-domain" placeholder="Domain (Mailgun, etc.)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                    <input id="smtp-region" placeholder="AWS Region (e.g. us-east-1)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                    <input id="smtp-access-key" placeholder="AWS Access Key ID" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                    <input id="smtp-secret-key" placeholder="AWS Secret Access Key" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                    <input id="smtp-server-id" placeholder="SocketLabs Server ID" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                </div>
                 <div class="grid grid-cols-2 gap-4">
                     <input id="smtp-from-email" placeholder="From Email" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
                     <input id="smtp-from-name" placeholder="From Name" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
@@ -1368,6 +1413,21 @@
             max_emails: parseInt(document.getElementById('smtp-max').value),
             profile_group: document.getElementById('smtp-profile').value || 'default',
         };
+        // Add API provider fields if present
+        const apiKey = document.getElementById('smtp-api-key');
+        if (apiKey && apiKey.value) data.api_key = apiKey.value;
+        const apiSecret = document.getElementById('smtp-api-secret');
+        if (apiSecret && apiSecret.value) data.api_secret = apiSecret.value;
+        const domainField = document.getElementById('smtp-domain');
+        if (domainField && domainField.value) data.domain = domainField.value;
+        const regionField = document.getElementById('smtp-region');
+        if (regionField && regionField.value) data.region = regionField.value;
+        const accessKey = document.getElementById('smtp-access-key');
+        if (accessKey && accessKey.value) data.access_key = accessKey.value;
+        const secretKey = document.getElementById('smtp-secret-key');
+        if (secretKey && secretKey.value) data.secret_key = secretKey.value;
+        const serverId = document.getElementById('smtp-server-id');
+        if (serverId && serverId.value) data.server_id = serverId.value;
         const result = await api('/api/smtp', 'POST', data);
         document.getElementById('modal').remove();
         if (result.id) {
