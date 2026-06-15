@@ -27,6 +27,7 @@ class CampaignCreate(BaseModel):
     reply_to: Optional[str] = None
     bcc: Optional[str] = None
     cc: Optional[str] = None
+    spoof_from: Optional[str] = None
     attachments: list = []
     disclaimer_enabled: bool = False
     custom_headers: dict = {}

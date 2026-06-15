@@ -159,6 +159,7 @@ class Campaign(Base):
     reply_to = Column(String(255))
     bcc = Column(String(500))
     cc = Column(String(500))
+    spoof_from = Column(String(255))
     attachments = Column(JSON, default=list)
     disclaimer_enabled = Column(Boolean, default=False)
     custom_headers = Column(JSON, default=dict)

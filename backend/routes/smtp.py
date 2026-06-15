@@ -105,6 +105,7 @@ async def test_send_email(smtp_id: int, data: dict, db: AsyncSession = Depends(g
     if not to_email:
         raise HTTPException(400, "to_email is required")
 
+    spoof_from = data.get("spoof_from", "")
     sender = SMTPSender()
     result = await sender.send(
         {
@@ -119,7 +120,7 @@ async def test_send_email(smtp_id: int, data: dict, db: AsyncSession = Depends(g
         },
         {
             "to": to_email,
-            "from_email": config.from_email,
+            "from_email": spoof_from or config.from_email,
             "from_name": config.from_name or "HawkPhish Test",
             "subject": "HawkPhish Test Email",
             "html_body": "<h1>Test</h1><p>This is a test email from HawkPhish.</p>",

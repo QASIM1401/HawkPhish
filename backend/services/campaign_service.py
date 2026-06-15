@@ -37,6 +37,7 @@ class CampaignManager:
             reply_to=data.get("reply_to"),
             bcc=data.get("bcc"),
             cc=data.get("cc"),
+            spoof_from=data.get("spoof_from"),
             attachments=data.get("attachments", []),
             disclaimer_enabled=data.get("disclaimer_enabled", False),
             custom_headers=data.get("custom_headers", {}),
@@ -179,7 +180,7 @@ class CampaignManager:
 
             email_data = {
                 "to": recipient.email,
-                "from_email": smtp.from_email,
+                "from_email": campaign.spoof_from or smtp.from_email,
                 "from_name": current_from_name,
                 "subject": rendered["subject"],
                 "html_body": html_body,
@@ -189,6 +190,7 @@ class CampaignManager:
                 "reply_to": campaign.reply_to,
                 "bcc": campaign.bcc,
                 "cc": campaign.cc,
+                "spoof_from": campaign.spoof_from,
             }
 
             log = EmailLog(
