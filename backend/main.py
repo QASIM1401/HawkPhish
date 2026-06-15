@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 from contextlib import asynccontextmanager
 from database import init_db, get_db
-from routes import smtp, campaigns, templates, groups, tracking, landing_pages, proxies, smtp_server, audit_logs
+from routes import smtp, campaigns, templates, groups, tracking, landing_pages, proxies, smtp_server, audit_logs, external
 import os
 
 @asynccontextmanager
@@ -38,6 +38,7 @@ app.include_router(landing_pages.router)
 app.include_router(proxies.router)
 app.include_router(smtp_server.router)
 app.include_router(audit_logs.router)
+app.include_router(external.router)
 
 
 @app.get("/api/health")

