@@ -1,3 +1,0 @@
-dnspython>=2.1.0
-setuptools>=45.0
-wheel>=0.36.0
