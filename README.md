@@ -247,7 +247,6 @@ If HawkPhish helped your security work, consider supporting continued developmen
 
   <p>
     <img src="https://img.shields.io/badge/Binance-893759503-F0B90B?style=for-the-badge&logo=binance&logoColor=black" alt="Binance ID">
-    <strong>Binance ID:</strong> <code>893759503</code>
   </p>
 
   <table>
