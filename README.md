@@ -239,15 +239,14 @@ For full interactive docs, visit `/docs` after starting the server.
 
 ---
 
-## 💰 Support & Donate
+## 💰 Support via Crypto
 
-If HawkPhish helped your security work, consider supporting continued development. Any contribution keeps the project alive and updated.
+If HawkPhish helped your security work, consider supporting continued development. **Crypto only — no fiat payment methods.**
 
 <div align="center">
 
-  <a href="#"><img src="Binance-Buy%20Me%20Coffee-yellow.svg" alt="Binance Buy Me Coffee" style="margin: 12px 0;"></a>
-
   <p>
+    <img src="https://img.shields.io/badge/Binance-893759503-F0B90B?style=for-the-badge&logo=binance&logoColor=black" alt="Binance ID">
     <strong>Binance ID:</strong> <code>893759503</code>
   </p>
 
