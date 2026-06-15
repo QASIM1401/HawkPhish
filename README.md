@@ -59,14 +59,17 @@ Everything runs locally with a lightweight **FastAPI** backend, **SQLite** datab
 | Module | Description |
 |--------|-------------|
 | 📊 **Dashboard** | Live stats, open/click/submit rates, live feed, target sessions and system status. |
-| 🚀 **Campaigns** | Create, start, pause, resume and cancel campaigns with random delays and proxy rotation. |
-| 📧 **Email Templates** | Custom HTML editor with live preview, file upload, variables and 6+ pre-built templates. |
-| 🌐 **Landing Pages** | Paste HTML, import any URL, upload files, or use 12+ pre-built login page templates. |
-| 👥 **Target Groups** | Organize recipients, bulk-import via CSV, store names, positions and custom data. |
-| 🔌 **SMTP Configs** | Supports 25+ providers (Office 365, Gmail, SendGrid, AWS SES, etc.) with health checks & bulk import. |
-| 🛡️ **Proxy Rotator** | HTTP / HTTPS / SOCKS4 / SOCKS5 proxy rotation with latency testing and bulk import. |
-| 📡 **Tracking** | Pixel tracking for opens, link tracking for clicks, credential capture and full session timelines. |
-| 📄 **PDF Reports** | Download per-campaign or dashboard summary PDFs for reporting. |
+| 🚀 **Campaigns** | Create, start, pause, resume and cancel campaigns with random delays, proxy rotation, and advanced settings. |
+| 📧 **Email Templates** | Custom HTML editor with live preview, variables, severity/tags, categories, and filtering. |
+| 🌐 **Landing Pages** | Single-file HTML, multi-file ZIP upload, import any URL, or use 12+ pre-built login page templates. |
+| 🔗 **External Integration** | Drop-in JavaScript SDK to track and capture credentials from ANY external landing page. |
+| 👥 **Target Groups** | Organize recipients, bulk-import via JSON/CSV, store names, positions and custom data. |
+| 🔌 **SMTP Configs** | 30+ providers including API-based (SendGrid, Mailgun, AWS SES, Brevo, Resend, Mailjet, etc.) and SMTP relay. |
+| 🛡️ **Proxy Rotator** | HTTP / HTTPS / SOCKS4 / SOCKS5 proxy rotation with health checks, latency testing and bulk import. |
+| 📡 **Tracking** | Pixel tracking for opens, link tracking for clicks, credential capture, and full session timelines. |
+| 📄 **Reports** | Download per-campaign or dashboard summary PDFs, JSON, and CSV exports. |
+| 📋 **Audit Logs** | Every action logged with timestamps for compliance and review. |
+| 🔧 **Built-in SMTP Server** | Raw SMTP server for receiving and relaying emails directly. |
 | 🔒 **Ethical First** | Built-in warnings and "Authorized Use Only" branding. |
 
 ---
@@ -157,85 +160,450 @@ http://localhost:8000
 
 ---
 
-## 🎓 Usage Tutorial
+## 🎓 Complete Usage Tutorial
 
-### Step 1 — Configure an SMTP server
+### Step 1 — Start the Server
+
+Open a terminal and navigate to the project:
+
+```bash
+cd hawkphish/backend
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Open your browser to:
+
+```
+http://localhost:8000
+```
+
+The dashboard will load immediately. No build step required.
+
+---
+
+### Step 2 — Configure SMTP (Email Sending)
 
 1. Go to **SMTP Configs** in the sidebar.
 2. Click **New SMTP**.
-3. Select your provider (Office 365, Gmail, SendGrid, AWS SES, etc.) or choose **Custom SMTP**.
-4. Fill in the host, port, username, password / API key, and sender email.
-5. Click **Create & Validate SMTP** to verify the connection.
+3. Select your provider from the dropdown:
 
-> 💡 **Tip:** You can bulk-import SMTP configs from the **Bulk Import** button. Supported formats include:
+**Standard SMTP (Username + Password):**
+- Office 365, Gmail, Google Workspace, Outlook.com
+- Zoho, Yandex, Mailtrap, IONOS
+- GoDaddy, Namecheap, HostGator, Bluehost, SiteGround
+- Custom SMTP (any host/port)
+
+**API Providers (API Key only, no SMTP connection):**
+- **SendGrid API** — `api_key` required
+- **Amazon SES API** — `access_key` + `secret_key` + `region` (e.g. `us-east-1`)
+- **Mailgun API** — `api_key` + `domain` (e.g. `mg.yoursite.com`)
+- **Postmark API** — `api_key` (Server Token)
+- **SparkPost API** — `api_key`
+- **Brevo API** — `api_key`
+- **Mailchimp / Mandrill API** — `api_key`
+- **MailerSend API** — `api_key`
+- **Resend API** — `api_key`
+- **Elastic Email API** — `api_key`
+- **SMTP2GO API** — `api_key`
+- **Pepipost API** — `api_key`
+- **SocketLabs API** — `api_key` + `server_id`
+- **Mailjet API** — `api_key` + `api_secret`
+
+4. Fill the fields. For API providers, the **API Key** section will appear automatically.
+5. Click **Create & Validate SMTP**. The system will test the connection and mark it healthy/unhealthy.
+
+> 💡 **Bulk Import:** Click the **Bulk Import** button to paste multiple configs at once:
 > ```text
-> smtp.office365.com|user@company.com|password||user@company.com
-> smtp.gmail.com|you@gmail.com|app-password
-> mail.example.com:465:user1{Pass123
+> smtp.office365.com|587|user@company.com|password
+> smtp.gmail.com|587|you@gmail.com|app-password
 > ```
 
-### Step 2 — Add target recipients
+> 💡 **Test Send:** Every SMTP config has a **Test Send** button. Use it to send a test email to yourself before launching a campaign.
 
-1. Go to **Groups** and click **New Group**.
-2. Give it a name, description, and color.
-3. Open the group and add recipients one by one or use **Bulk Import**.
+---
 
-**Bulk import format:**
-```csv
-user1@example.com,John
-user2@example.com,Jane
-user3@example.com
+### Step 3 — Create Target Groups
+
+1. Go to **Groups** in the sidebar.
+2. Click **New Group**.
+3. Give it a name, description, and color.
+4. Open the group to add recipients.
+
+**Add Recipients (one by one):**
+- Email (required)
+- First Name, Last Name
+- Position / Role
+- Any other data is stored and can be used in templates
+
+**Bulk Import (JSON):**
+```json
+{
+  "recipients": [
+    {"email":"user1@company.com","first_name":"John","last_name":"Doe","position":"Manager"},
+    {"email":"user2@company.com","first_name":"Jane","last_name":"Smith","position":"Engineer"}
+  ]
+}
 ```
 
-### Step 3 — Create an email template
+> 💡 **Custom Fields:** You can pass any extra fields (department, location, employee_id) and they will be stored. Use them in templates as `##department##`, `##location##`, etc.
 
-1. Go to **Templates** and click **New Template**.
-2. Enter a name and subject.
-3. Paste your HTML email body or upload an `.html` file.
-4. Insert variables like `##email##`, `##first_name##`, `##link##`, `##domain##`, `##date##`.
-5. Use the live preview to verify the design.
+---
 
-### Step 4 — Create a landing page (optional)
+### Step 4 — Create Email Templates
 
-1. Go to **Landing Pages** and click **New Page**.
-2. Paste custom HTML, upload a file, import from a URL, or pick a pre-built template (Google, Microsoft 365, etc.).
-3. Define the fields you want to capture (default: `email`, `password`).
-4. Set a redirect URL after submission if needed.
+1. Go to **Templates** in the sidebar.
+2. Click **New Template**.
+3. Fill in:
+   - **Name** — internal name (e.g. "Office 365 Reset")
+   - **Subject** — email subject line
+   - **Category** — for organization (e.g. "corporate", "social")
+   - **Severity** — Low / Medium / High / Critical
+   - **Tags** — comma-separated (e.g. "office365, urgent")
+   - **HTML Body** — the full email HTML
 
-### Step 5 — Launch a campaign
+**Built-in Variables (auto-replaced per recipient):**
+| Variable | Replaced With |
+|----------|---------------|
+| `##email##` | Recipient's email address |
+| `##first_name##` | Recipient's first name |
+| `##last_name##` | Recipient's last name |
+| `##full_name##` | First + Last name |
+| `##position##` | Recipient's position |
+| `##link##` | Tracking link (auto-generated) |
+| `##domain##` | Recipient's email domain |
+| `##date##` | Current date |
+| `##tracking_id##` | Unique tracking ID |
+| `##company##` | Recipient's domain (uppercase) |
+| `##phone##` | Recipient's phone (if stored) |
+| `##location##` | Recipient's location (if stored) |
+| Any custom field | `##field_name##` |
 
-1. Go to **Campaigns** and click **New Campaign**.
-2. Select:
-   - Email template
-   - SMTP config
-   - Target group
-   - Landing page (optional)
-3. Set min/max delay between emails.
-4. Enable proxy rotation if you added proxies.
-5. Click **Create Campaign**, then **Start**.
+**Subject Line Rotation:**
+You can create multiple subject lines separated by `;` for rotation:
+```
+Security Alert: Action Required;Your account needs verification;Urgent: Confirm your identity
+```
 
-### Step 6 — Monitor results
+> 💡 **Filtering:** Templates can be filtered by name, category, tag, or severity.
+> 💡 **Upload:** You can upload an `.html` file instead of pasting.
 
-1. Return to the **Dashboard**.
-2. Watch the **Live Feed** for opens, clicks, and credential submissions.
-3. Click any session in **Target Sessions** for a full event timeline.
-4. Download PDF reports from the campaign list or dashboard.
+---
+
+### Step 5 — Create Landing Pages
+
+1. Go to **Landing Pages** in the sidebar.
+2. Click **New Page**.
+
+**Method A — Paste HTML (Simple):**
+- Paste your HTML directly into the editor.
+- Set capture fields (e.g. `email`, `password`, `otp`).
+- Set a redirect URL (where users go after submitting).
+- Click **Create**.
+
+**Method B — Upload ZIP (Multi-File):**
+- Click **Upload ZIP**.
+- Select a `.zip` file containing your full landing page (HTML, CSS, JS, images).
+- The system extracts all files and serves them.
+- The root HTML file is auto-detected (e.g. `index.html`).
+- You can also upload individual files (CSS, JS, images) later.
+
+**Method C — Import from URL:**
+- Enter any URL (e.g. `https://login.microsoftonline.com`).
+- The system fetches the HTML.
+- You can then edit it.
+
+**Method D — Pre-built Templates:**
+- Click **Use Template**.
+- Choose from: Google Login, Microsoft 365, Office 365, LinkedIn, Outlook Web, AWS Console, Slack, GitHub, Zoom, Dropbox, PayPal, Apple ID.
+- Each comes with realistic HTML and correct capture fields.
+
+**Capture Fields:**
+You can capture ANY form fields by name. Common fields:
+- `email`, `password`, `username`, `otp`, `ssn`, `card`, `pin`, `phone`
+- Any custom field name works automatically.
+
+> 💡 **File Management:** After creating a landing page, go to **Files** tab to see all uploaded files. You can delete individual files or re-upload.
+
+---
+
+### Step 6 — External Integration (Drop-in SDK)
+
+If you want to track an **external landing page** (not hosted on HawkPhish):
+
+1. Go to **Integrations** in the sidebar.
+2. Click **Generate SDK**.
+3. Copy the generated JavaScript snippet.
+4. Paste it into the `<head>` of your external landing page.
+
+**What the SDK does:**
+- Tracks page views, clicks, and form submissions
+- Auto-captures any form fields (email, password, etc.)
+- Sends data back to HawkPhish via CORS
+- Works with any website, any platform (WordPress, Wix, custom HTML)
+
+**How to use:**
+1. Create a campaign in HawkPhish.
+2. Generate a tracking link for that campaign.
+3. Send the tracking link in your email.
+4. When the user clicks, they go to your external page.
+5. The SDK on that page reports everything back to HawkPhish.
+
+> 💡 **No landing page required in the campaign.** Just set the redirect URL in the email template to point to your external site.
+
+---
+
+### Step 7 — Launch a Campaign
+
+1. Go to **Campaigns** in the sidebar.
+2. Click **New Campaign**.
+3. Fill in:
+   - **Name** — e.g. "Q1 Security Awareness"
+   - **Template** — select from your templates
+   - **SMTP Config** — select a working provider
+   - **Target Group** — select recipients
+   - **Landing Page** — optional, select if you want credential capture
+   - **Settings:**
+     - `min_delay` — minimum seconds between emails (default: 2)
+     - `max_delay` — maximum seconds between emails (default: 8)
+     - `base_url` — your server URL (e.g. `http://your-server.com`)
+   - **Advanced Settings:**
+     - **Subject Rotation** — rotate between multiple subject lines
+     - **From Name Rotation** — rotate sender names
+     - **Letter Rotation** — rotate between multiple templates
+     - **Spoof From** — display a different sender address
+     - **Reply-To** — set a reply-to address
+     - **BCC / CC** — add hidden recipients
+     - **Custom Headers** — add any SMTP headers
+     - **Disclaimer** — append a legal disclaimer
+     - **Attachments** — attach files to the email
+
+4. Click **Create Campaign**.
+5. Click **Start** to begin sending.
+
+**Campaign Controls:**
+- **Start** — begins sending emails with random delays
+- **Pause** — pauses the campaign (can resume later)
+- **Cancel** — permanently stops the campaign
+- **Status** — Draft → Scheduled → Running → Paused → Completed
+
+> 💡 **Profile Groups:** You can assign SMTP configs to groups (e.g. "default", "clients", "personal"). Campaigns pick from the assigned group.
+
+---
+
+### Step 8 — Monitor & Track Results
+
+**Dashboard:**
+- Total campaigns, running/completed count
+- Total sent, opened, clicked, submitted
+- Open Rate, Click Rate, Submit Rate
+- Resource counts (SMTP configs, groups, recipients)
+
+**Live Feed:**
+- Real-time stream of opens, clicks, and credential submissions
+- Shows email, campaign, IP, browser, OS, device, country, city, ISP
+- Updates automatically
+
+**Target Sessions:**
+- Click any session to see the full timeline
+- Events: sent → opened → clicked → submitted
+- IP addresses, browsers, devices, countries
+- Full event history with timestamps
+
+**Tracking Methods:**
+1. **Pixel Tracking** — invisible 1x1 image in the email. When opened, records the open.
+2. **Link Tracking** — all links in the email are wrapped. When clicked, records the click and redirects to the landing page.
+3. **Form Submission** — when the user submits the landing page form, all fields are captured.
+
+**Credential Capture:**
+- Go to **Landing Pages** → click on a page → **Captured Data** tab.
+- See all submitted credentials with timestamps.
+- Export to CSV or JSON.
+
+---
+
+### Step 9 — Proxies (Optional)
+
+If you want to rotate proxies during sending:
+
+1. Go to **Proxies** in the sidebar.
+2. Click **New Proxy**.
+3. Enter:
+   - Name, Type (HTTP / HTTPS / SOCKS4 / SOCKS5)
+   - Host, Port
+   - Username / Password (if authenticated)
+4. Click **Test** to verify the proxy works.
+
+**Bulk Import:**
+```
+http://user:pass@proxy1.com:8080
+socks5://proxy2.com:1080
+http://proxy3.com:3128
+```
+
+**In Campaigns:**
+- Enable **Use Proxies** when creating a campaign.
+- The system will rotate through active, healthy proxies for each email.
+- Failed proxies are auto-skipped.
+
+---
+
+### Step 10 — Built-in SMTP Server (Optional)
+
+1. Go to **SMTP Server** in the sidebar.
+2. Click **Start Server**.
+3. Set host (e.g. `0.0.0.0`) and port (e.g. `2525`).
+4. The server starts listening for raw SMTP connections.
+5. You can use it as a local relay or for testing.
+6. Click **Stop Server** to shut it down.
+
+> 💡 **Status Panel:** Shows connections, emails processed, and errors in real-time.
+
+---
+
+### Step 11 — Audit Logs
+
+1. Go to **Audit Logs** in the sidebar.
+2. View every action: campaign created, started, paused, SMTP added, etc.
+3. Filter by action type or entity.
+4. See timestamps, user, success/failure status.
+
+---
+
+### Step 12 — Reports & Exports
+
+**Per-Campaign Reports:**
+1. Go to **Campaigns**.
+2. Click the menu (⋮) on any campaign.
+3. Choose:
+   - **Download PDF** — full campaign report with charts
+   - **Download JSON** — machine-readable report
+   - **Download CSV** — spreadsheet-friendly data
+
+**Dashboard Summary PDF:**
+1. Go to **Dashboard**.
+2. Click **Download Summary PDF**.
+3. Gets a PDF of all campaigns and stats.
+
+**Campaign Timeline:**
+1. Go to **Campaigns**.
+2. Click **Timeline** on any campaign.
+3. See every recipient's journey: sent → opened → clicked → submitted.
 
 ---
 
 ## 🧪 API Endpoints
 
+HawkPhish exposes a full REST API. For interactive documentation, visit `/docs` after starting the server.
+
+### Core Endpoints
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| GET/POST | `/api/campaigns` | List / create campaigns |
-| POST | `/api/campaigns/{id}/start` | Start a campaign |
-| POST | `/api/campaigns/{id}/pause` | Pause a campaign |
+| GET | `/api/health` | Server health check |
 | GET | `/api/dashboard` | Dashboard statistics |
-| GET | `/api/live-feed` | Recent target events |
-| GET | `/api/sessions` | Target session list |
+| GET/POST | `/api/campaigns` | List / create campaigns |
+| GET | `/api/campaigns/{id}` | Get campaign details |
+| PUT | `/api/campaigns/{id}` | Update campaign status |
+| DELETE | `/api/campaigns/{id}` | Delete campaign |
+| POST | `/api/campaigns/{id}/start` | Start sending |
+| POST | `/api/campaigns/{id}/pause` | Pause sending |
+| POST | `/api/campaigns/{id}/cancel` | Cancel campaign |
+| GET | `/api/campaigns/{id}/timeline` | Recipient timeline |
+| GET | `/api/campaigns/{id}/report/json` | JSON report |
+| GET | `/api/campaigns/{id}/report/csv` | CSV report |
+| GET | `/api/campaigns/{id}/report/pdf` | PDF report |
+| GET | `/api/campaigns/report/pdf/summary` | Dashboard summary PDF |
 
-For full interactive docs, visit `/docs` after starting the server.
+### SMTP
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/smtp` | List / create SMTP configs |
+| GET | `/api/smtp/{id}` | Get SMTP config |
+| PUT | `/api/smtp/{id}` | Update SMTP config |
+| DELETE | `/api/smtp/{id}` | Delete SMTP config |
+| POST | `/api/smtp/{id}/health` | Test health |
+| POST | `/api/smtp/{id}/test-send` | Send test email |
+| POST | `/api/smtp/validate-all` | Validate all configs |
+| POST | `/api/smtp/bulk-import` | Bulk import configs |
+
+### Templates
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/templates` | List / create templates |
+| GET | `/api/templates/{id}` | Get template |
+| PUT | `/api/templates/{id}` | Update template |
+| DELETE | `/api/templates/{id}` | Delete template |
+
+### Landing Pages
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/landing-pages` | List / create pages |
+| GET | `/api/landing-pages/{id}` | Get page |
+| PUT | `/api/landing-pages/{id}` | Update page |
+| DELETE | `/api/landing-pages/{id}` | Delete page |
+| POST | `/api/landing-pages/{id}/upload-zip` | Upload ZIP file |
+| POST | `/api/landing-pages/{id}/upload-file` | Upload single file |
+| GET | `/api/landing-pages/{id}/files` | List files |
+| DELETE | `/api/landing-pages/{id}/files/{name}` | Delete file |
+| POST | `/api/landing-pages/import-url` | Import from URL |
+| GET | `/api/landing-pages/templates/list` | List pre-built templates |
+| POST | `/api/landing-pages/templates/{name}/use` | Use pre-built template |
+
+### Tracking
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/pixel/{tracking_id}` | Tracking pixel (image) |
+| GET | `/track/{tracking_id}` | Click redirect |
+| GET | `/lp/{id}` | Show landing page |
+| GET | `/lp/{id}/{path}` | Serve static files |
+| POST | `/lp/{id}/submit` | Capture credentials |
+| GET | `/api/sessions` | List sessions |
+| GET | `/api/sessions/{id}` | Session details |
+| GET | `/api/live-feed` | Real-time events |
+
+### External Integration
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/external/track` | Track external event |
+| POST | `/api/external/submit` | Capture external credentials |
+| POST | `/api/external/generate-link` | Generate tracking link |
+| POST | `/api/external/generate-sdk` | Generate JS SDK |
+| GET | `/api/external/sdk.js` | Serve SDK script |
+
+### Groups
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/groups` | List / create groups |
+| GET | `/api/groups/{id}` | Get group |
+| PUT | `/api/groups/{id}` | Update group |
+| DELETE | `/api/groups/{id}` | Delete group |
+| POST | `/api/groups/{id}/recipients` | Add recipient |
+| POST | `/api/groups/{id}/recipients/import` | Bulk import |
+| DELETE | `/api/groups/{id}/recipients/{rid}` | Delete recipient |
+
+### Proxies
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/proxies` | List / create proxies |
+| GET | `/api/proxies/{id}` | Get proxy |
+| PUT | `/api/proxies/{id}` | Update proxy |
+| DELETE | `/api/proxies/{id}` | Delete proxy |
+| POST | `/api/proxies/{id}/test` | Test proxy |
+| POST | `/api/proxies/test-all` | Test all proxies |
+| POST | `/api/proxies/bulk-import` | Bulk import |
+
+### SMTP Server
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/smtp-server/start` | Start built-in SMTP server |
+| POST | `/api/smtp-server/stop` | Stop server |
+| GET | `/api/smtp-server/status` | Get status |
+
+### Audit Logs
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/audit-logs` | List logs |
+| GET | `/api/audit-logs/stats` | Statistics |
 
 ---
 
@@ -297,7 +665,7 @@ The authors assume no liability for misuse of this tool. **Use responsibly and e
 
 <div align="center">
   <br>
-  <img src="HawkPhish%20Logo.png" alt="HawkPhish" width="64" style="border-radius: 12px;">
+  <img src="frontend/assets/HawkPhish%20Logo.png" alt="HawkPhish" width="64" style="border-radius: 12px;">
   <br>
   <p><strong>HawkPhish</strong> — See what others click.</p>
   <br>
