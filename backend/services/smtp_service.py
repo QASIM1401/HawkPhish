@@ -169,9 +169,9 @@ class SMTPHealthChecker:
         "zohomail": ("smtp.zoho.com", 587),
         "yandex": ("smtp.yandex.com", 465),
         "mailtrap": ("smtp.mailtrap.io", 587),
-        " Brevo": ("smtp-relay.brevo.com", 587),
+        "brevo": ("smtp-relay.brevo.com", 587),
         "mailchimp": ("smtp.mailchimp.com", 587),
-        "turbo smtp": ("smtp.turbo-smtp.com", 587),
+        "turbosmtp": ("smtp.turbo-smtp.com", 587),
         "one_com": ("send.one.com", 465),
         "godaddy": ("smtpout.secureserver.net", 465),
         "ics_cool": ("mail.icsCoolEmail.com", 587),
@@ -183,11 +183,11 @@ class SMTPHealthChecker:
         "siteground": ("mail.siteground.com", 465),
         "google_workspace": ("smtp.google.com", 587),
         "microsoft_365": ("smtp.office365.com", 587),
-        " Mimecast": ("mimecast-smtp-out.qualys.com", 587),
-        " proofpoint": ("smtp-us.ppe-hosted.com", 587),
+        "mimecast": ("mimecast-smtp-out.qualys.com", 587),
+        "proofpoint": ("smtp-us.ppe-hosted.com", 587),
     }
 
-    API_PROVIDERS = ["sendgrid", "mailgun", "postmark", "sparkpost", "mailchimp"]
+    API_PROVIDERS = ["sendgrid", "mailgun", "postmark", "sparkpost"]
 
     @staticmethod
     async def check(config: dict) -> dict:
@@ -225,8 +225,8 @@ class SMTPHealthChecker:
         loop = asyncio.get_event_loop()
         def _test():
             try:
+                context = _make_tls_context()
                 if use_tls:
-                    context = _make_tls_context()
                     with smtplib.SMTP(host, port, timeout=15) as server:
                         server.ehlo()
                         server.starttls(context=context)
@@ -410,7 +410,10 @@ class SMTPSender:
                 context.check_hostname = False
                 context.verify_mode = ssl.CERT_NONE
                 if proxy:
-                    import socks
+                    try:
+                        import socks
+                    except ImportError:
+                        return {"success": False, "error": "PySocks is required for proxy support. Install with: pip install PySocks"}
                     ptype = proxy.get("proxy_type", "http")
                     ptype_map = {"socks5": socks.SOCKS5, "socks4": socks.SOCKS4, "http": socks.HTTP, "https": socks.HTTP}
                     s = socks.socksocket()

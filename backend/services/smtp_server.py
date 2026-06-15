@@ -139,7 +139,7 @@ class SMTPSession:
             try:
                 with smtplib.SMTP(mx, 25, timeout=15) as server:
                     payload = f"From: {mail_from}\r\nTo: {rcpt_to}\r\n{email_data}"
-                    server.sendmail(mail_from, [rcpt_to], payload.encode("utf-8"))
+                    server.sendmail(mail_from, [rcpt_to], payload)
                 return True
             except Exception:
                 continue
