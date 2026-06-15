@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HawkPhish</title>
+    <link rel="icon" type="image/png" href="assets/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { colors: { dark: { 100: '#1a1a2e', 200: '#16213e', 300: '#0f3460', 400: '#e94560' }}}}
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        *{font-family:'Inter',sans-serif;box-sizing:border-box}
+        html,body{height:100%;overflow:hidden}
+        body{background:#0f0f23}
+        .glass{background:rgba(255,255,255,.05);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1)}
+        .glow{box-shadow:0 0 20px rgba(233,69,96,.3)}
+        .nav-item:hover{background:rgba(233,69,96,.15)}
+        .nav-item.active{background:rgba(233,69,96,.2);border-left:3px solid #e94560}
+        .stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,.3)}
+        .btn-primary{background:linear-gradient(135deg,#e94560,#c23152)}
+        .btn-primary:hover{background:linear-gradient(135deg,#c23152,#a02040)}
+        .btn-success{background:linear-gradient(135deg,#22c55e,#16a34a)}
+        .btn-success:hover{background:linear-gradient(135deg,#16a34a,#15803d)}
+        .fade-in{animation:fadeIn .3s ease-in}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        .pulse-dot{animation:pulse 2s infinite}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+        ::-webkit-scrollbar{width:6px}
+        ::-webkit-scrollbar-track{background:#1a1a2e}
+        ::-webkit-scrollbar-thumb{background:#e94560;border-radius:3px}
+        select option{background:#1a1a2e;color:#fff;padding:8px}
+        select{color-scheme:dark}
+        .sidebar-open .sidebar{transform:translateX(0)}
+        @media(max-width:768px){
+            .sidebar{position:fixed;z-index:50;transform:translateX(-100%);transition:transform .3s;width:260px;height:100vh}
+            .sidebar-open .sidebar{transform:translateX(0)}
+            .sidebar-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;display:none}
+            .sidebar-open .sidebar-overlay{display:block}
+        }
+        .preview-frame{background:#fff;border-radius:8px;overflow:hidden;min-height:300px}
+        .preview-frame iframe{width:100%;height:100%;border:none;min-height:300px}
+        .tab-active{border-bottom:2px solid #e94560;color:#e94560}
+        .toast{position:fixed;top:20px;right:20px;z-index:100;animation:slideIn .3s ease-out}
+        @keyframes slideIn{from{opacity:0;transform:translateX(100px)}to{opacity:1;transform:translateX(0)}}
+        .spinner{border:3px solid rgba(255,255,255,.1);border-top-color:#e94560;border-radius:50%;width:20px;height:20px;animation:spin .6s linear infinite;display:inline-block}
+        @keyframes spin{to{transform:rotate(360deg)}}
+    </style>
+</head>
+<body class="text-white h-screen overflow-hidden">
+    <div id="app" class="flex h-screen">
+        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+        <aside class="sidebar w-64 glass border-r border-white/10 flex flex-col h-full overflow-hidden">
+            <div class="p-6 border-b border-white/10 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <img src="assets/logo.png" alt="HawkPhish" class="w-10 h-10 rounded-xl object-cover">
+                    <div><h1 class="text-xl font-bold">HawkPhish</h1><p class="text-xs text-gray-400">v1.1.0</p></div>
+                </div>
+                <button onclick="toggleSidebar()" class="md:hidden text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                <a href="#" onclick="showPage('dashboard')" class="nav-item active flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-chart-pie w-5"></i>Dashboard</a>
+                <a href="#" onclick="showPage('campaigns')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-rocket w-5"></i>Campaigns</a>
+                <a href="#" onclick="showPage('templates')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-file-code w-5"></i>Templates</a>
+                <a href="#" onclick="showPage('landing-pages')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-globe w-5"></i>Landing Pages</a>
+                <a href="#" onclick="showPage('groups')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-users w-5"></i>Groups</a>
+                <a href="#" onclick="showPage('smtp')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-envelope w-5"></i>SMTP Configs</a>
+                <a href="#" onclick="showPage('proxies')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-shield-halved w-5"></i>Proxies</a>
+                <div class="border-t border-white/10 my-2"></div>
+                <a href="#" onclick="showPage('about')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-info-circle w-5"></i>About</a>
+            </nav>
+            <div class="p-4 border-t border-white/10">
+                <div class="glass rounded-lg p-3 text-center">
+                    <p class="text-xs text-gray-400">Authorized Use Only</p>
+                    <p class="text-xs text-red-400 mt-1"><i class="fas fa-shield-halved"></i> Red Team Tool</p>
+                </div>
+            </div>
+        </aside>
+        <main class="flex-1 h-full overflow-y-auto">
+            <div class="md:hidden p-4 border-b border-white/10 glass flex items-center gap-3">
+                <button onclick="toggleSidebar()" class="text-gray-400 hover:text-white"><i class="fas fa-bars text-xl"></i></button>
+                <img src="assets/logo.png" alt="HawkPhish" class="w-8 h-8 rounded-lg object-cover">
+                <span class="font-bold">HawkPhish</span>
+            </div>
+            <div id="content" class="p-4 md:p-8 fade-in"></div>
+        </main>
+    </div>
+
+    <script>
+    const API = '';
+    let currentPage = 'dashboard';
+
+    async function api(path, method = 'GET', body = null) {
+        try {
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            const r = await fetch(API + path, opts);
+            if (!r.ok) { console.warn('API error:', path, r.status); return null; }
+            return r.json();
+        } catch(e) { console.warn('API failed:', path, e.message); return null; }
+    }
+
+    function toggleSidebar() {
+        document.getElementById('app').classList.toggle('sidebar-open');
+    }
+
+    function toast(msg, type = 'success') {
+        const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-blue-500', warning: 'bg-yellow-500' };
+        const icons = { success: 'check-circle', error: 'exclamation-circle', info: 'info-circle', warning: 'exclamation-triangle' };
+        const el = document.createElement('div');
+        el.className = `toast glass rounded-lg px-4 py-3 flex items-center gap-3 ${colors[type]}/20 border border-${type === 'success' ? 'green' : type === 'error' ? 'red' : type === 'info' ? 'blue' : 'yellow'}-500/30`;
+        el.innerHTML = `<i class="fas fa-${icons[type]} text-${type === 'success' ? 'green' : type === 'error' ? 'red' : type === 'info' ? 'blue' : 'yellow'}-400"></i><span class="text-sm">${msg}</span>`;
+        document.body.appendChild(el);
+        setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3000);
+    }
+
+    function statusColor(s) {
+        const c = { draft:'bg-gray-500/20 text-gray-400', queued:'bg-yellow-500/20 text-yellow-400', running:'bg-green-500/20 text-green-400', paused:'bg-yellow-500/20 text-yellow-400', completed:'bg-blue-500/20 text-blue-400', cancelled:'bg-red-500/20 text-red-400' };
+        return c[s] || 'bg-gray-500/20 text-gray-400';
+    }
+
+    function showModal(title, content, wide = false) {
+        const existing = document.getElementById('modal');
+        if (existing) existing.remove();
+        const modal = document.createElement('div');
+        modal.id = 'modal';
+        modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4';
+        modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+        modal.innerHTML = `<div class="glass rounded-2xl p-6 md:p-8 w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} mx-4 fade-in max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6"><h3 class="text-xl font-bold">${title}</h3><button onclick="document.getElementById('modal').remove()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button></div>
+            ${content}</div>`;
+        document.body.appendChild(modal);
+    }
+
+    async function showPage(page) {
+        currentPage = page;
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(n => {
+            if (n.textContent.trim().toLowerCase().includes(page.replace('-', ' '))) n.classList.add('active');
+        });
+        const el = document.getElementById('content');
+        el.className = 'p-4 md:p-8 fade-in';
+        document.getElementById('app').classList.remove('sidebar-open');
+        switch(page) {
+            case 'dashboard': return renderDashboard(el);
+            case 'campaigns': return renderCampaigns(el);
+            case 'templates': return renderTemplates(el);
+            case 'landing-pages': return renderLandingPages(el);
+            case 'groups': return renderGroups(el);
+            case 'smtp': return renderSMTP(el);
+            case 'proxies': return renderProxies(el);
+            case 'about': return renderAbout(el);
+        }
+    }
+
+    // ========== DASHBOARD ==========
+    async function renderDashboard(el) {
+        el.innerHTML = '<div class="flex items-center justify-center py-20"><div class="spinner"></div><span class="ml-3 text-gray-400">Loading dashboard...</span></div>';
+        const fallback = {campaigns:{total:0,running:0,completed:0},stats:{total_sent:0,total_opened:0,total_clicked:0,total_submitted:0,total_sessions:0,open_rate:0,click_rate:0,submit_rate:0},resources:{smtp_configs:0,groups:0,recipients:0}};
+        const d = (await api('/api/dashboard')) || fallback;
+        const feed = (await api('/api/live-feed?limit=20')) || [];
+        const sessions = (await api('/api/sessions?limit=20')) || [];
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">Dashboard</h2><p class="text-gray-400 mt-1">Real-time campaign tracking & target sessions</p></div>
+                <div class="flex gap-2">
+                    <button onclick="refreshDashboard()" class="glass px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10"><i class="fas fa-sync-alt mr-2 text-green-400"></i>Refresh</button>
+                    <a href="/api/campaigns/report/pdf/summary" target="_blank" class="glass px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10"><i class="fas fa-file-pdf mr-2 text-red-400"></i>PDF</a>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+                <div class="stat-card glass rounded-xl p-4"><p class="text-gray-400 text-xs">Sent</p><p class="text-2xl font-bold mt-1">${d.stats.total_sent}</p></div>
+                <div class="stat-card glass rounded-xl p-4"><p class="text-gray-400 text-xs">Opened</p><p class="text-2xl font-bold mt-1">${d.stats.open_rate}%</p></div>
+                <div class="stat-card glass rounded-xl p-4"><p class="text-gray-400 text-xs">Clicked</p><p class="text-2xl font-bold mt-1">${d.stats.click_rate}%</p></div>
+                <div class="stat-card glass rounded-xl p-4"><p class="text-gray-400 text-xs">Credentials</p><p class="text-2xl font-bold mt-1 text-red-400">${d.stats.total_submitted}</p></div>
+                <div class="stat-card glass rounded-xl p-4"><p class="text-gray-400 text-xs">Sessions</p><p class="text-2xl font-bold mt-1 text-purple-400">${d.stats.total_sessions}</p></div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="glass rounded-xl p-6">
+                    <h3 class="font-semibold mb-4"><i class="fas fa-bolt mr-2 text-yellow-400"></i>Live Feed</h3>
+                    <div class="space-y-2 max-h-[400px] overflow-y-auto" id="live-feed-list">
+                        ${feed.map(f => `
+                            <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-all text-sm">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${f.status === 'submitted' ? 'bg-red-500/20' : f.status === 'clicked' ? 'bg-yellow-500/20' : 'bg-green-500/20'}">
+                                    <i class="fas fa-${f.status === 'submitted' ? 'key text-red-400' : f.status === 'clicked' ? 'mouse-pointer text-yellow-400' : 'envelope-open text-green-400'}"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium truncate">${f.email || f.recipient_name || 'Unknown'}</div>
+                                    <div class="text-xs text-gray-500">${f.browser} ${f.os ? 'on ' + f.os : ''} ${f.country ? '&#127758; ' + f.country : ''}</div>
+                                </div>
+                                <div class="text-right flex-shrink-0">
+                                    <div class="text-xs text-gray-500">${f.time ? new Date(f.time).toLocaleTimeString() : ''}</div>
+                                    <div class="text-xs ${f.status === 'submitted' ? 'text-red-400' : f.status === 'clicked' ? 'text-yellow-400' : 'text-green-400'}">${f.status}</div>
+                                </div>
+                            </div>`).join('')}
+                        ${feed.length === 0 ? '<p class="text-center text-gray-500 py-8">No events yet — start a campaign to see live tracking</p>' : ''}
+                    </div>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <h3 class="font-semibold mb-4"><i class="fas fa-users mr-2 text-purple-400"></i>Target Sessions</h3>
+                    <div class="space-y-2 max-h-[400px] overflow-y-auto" id="sessions-list">
+                        ${sessions.map(s => `
+                            <div onclick="showSessionDetail(${s.id})" class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 transition-all cursor-pointer text-sm">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${s.status === 'submitted' ? 'bg-red-500/20' : s.status === 'clicked' ? 'bg-yellow-500/20' : 'bg-green-500/20'}">
+                                    <i class="fas fa-${s.status === 'submitted' ? 'skull-crossbones text-red-400' : s.status === 'clicked' ? 'crosshairs text-yellow-400' : 'user-secret text-green-400'}"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium truncate">${s.email}</div>
+                                    <div class="text-xs text-gray-500">${s.browsers.join(', ') || 'Unknown browser'} ${s.countries.length ? '&#127758; ' + s.countries.join(', ') : ''}</div>
+                                </div>
+                                <div class="text-right flex-shrink-0">
+                                    <div class="text-xs text-gray-500">${s.total_events} events</div>
+                                    <div class="text-xs text-gray-500">${s.ip_addresses.length} IP${s.ip_addresses.length !== 1 ? 's' : ''}</div>
+                                </div>
+                            </div>`).join('')}
+                        ${sessions.length === 0 ? '<p class="text-center text-gray-500 py-8">No sessions yet</p>' : ''}
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass rounded-xl p-6">
+                    <h3 class="font-semibold mb-4"><i class="fas fa-rocket mr-2 text-red-400"></i>Campaigns</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between"><span class="text-gray-400">Total</span><span class="font-bold">${d.campaigns.total}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Running</span><span class="font-bold text-green-400">${d.campaigns.running}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Completed</span><span class="font-bold text-blue-400">${d.campaigns.completed}</span></div>
+                    </div>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <h3 class="font-semibold mb-4"><i class="fas fa-server mr-2 text-red-400"></i>Resources</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between"><span class="text-gray-400">SMTP</span><span class="font-bold">${d.resources.smtp_configs}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Groups</span><span class="font-bold">${d.resources.groups}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Recipients</span><span class="font-bold">${d.resources.recipients}</span></div>
+                    </div>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <h3 class="font-semibold mb-4"><i class="fas fa-shield-halved mr-2 text-red-400"></i>System</h3>
+                    <div class="space-y-2">
+                        <div class="flex justify-between"><span class="text-gray-400">Version</span><span class="font-bold">1.2.0</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Status</span><span class="font-bold text-green-400"><span class="pulse-dot inline-block w-2 h-2 bg-green-400 rounded-full mr-1"></span>Online</span></div>
+                        <div class="flex justify-between"><span class="text-gray-400">Platform</span><span class="font-bold">Cross-Platform</span></div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function refreshDashboard() { showPage('dashboard'); toast('Dashboard refreshed', 'info'); }
+
+    async function showSessionDetail(sessionId) {
+        const s = await api('/api/sessions/' + sessionId);
+        const statusColors = { sent: 'gray', opened: 'green', clicked: 'yellow', submitted: 'red' };
+        const sc = statusColors[s.status] || 'gray';
+        showModal(`Session: ${s.email}`, `
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="glass rounded-lg p-3"><p class="text-xs text-gray-400">Status</p><p class="font-bold text-${sc}-400 capitalize">${s.status}</p></div>
+                    <div class="glass rounded-lg p-3"><p class="text-xs text-gray-400">Events</p><p class="font-bold">${s.total_events}</p></div>
+                    <div class="glass rounded-lg p-3"><p class="text-xs text-gray-400">Campaign</p><p class="font-bold text-sm">${s.campaign_name}</p></div>
+                    <div class="glass rounded-lg p-3"><p class="text-xs text-gray-400">Name</p><p class="font-bold text-sm">${s.recipient_name || 'N/A'}</p></div>
+                </div>
+                <div class="glass rounded-lg p-3">
+                    <p class="text-xs text-gray-400 mb-2">IP Addresses</p>
+                    <div class="flex flex-wrap gap-1">${s.ip_addresses.map(ip => `<span class="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-mono">${ip}</span>`).join('') || '<span class="text-gray-500">None</span>'}</div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="glass rounded-lg p-3"><p class="text-xs text-gray-400 mb-1">Browsers</p><p class="text-sm">${s.browsers.join(', ') || 'N/A'}</p></div>
+                    <div class="glass rounded-lg p-3"><p class="text-xs text-gray-400 mb-1">Devices</p><p class="text-sm">${s.devices.join(', ') || 'N/A'}</p></div>
+                    <div class="glass rounded-lg p-3"><p class="text-xs text-gray-400 mb-1">Countries</p><p class="text-sm">${s.countries.join(', ') || 'N/A'}</p></div>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-3"><i class="fas fa-stream mr-2 text-purple-400"></i>Event Timeline</h4>
+                    <div class="space-y-2 max-h-[300px] overflow-y-auto">
+                        ${(s.events || []).map(ev => {
+                            const icon = ev.type === 'submit' ? 'key text-red-400' : ev.type === 'click' ? 'mouse-pointer text-yellow-400' : 'envelope-open text-green-400';
+                            const bg = ev.type === 'submit' ? 'bg-red-500/20' : ev.type === 'click' ? 'bg-yellow-500/20' : 'bg-green-500/20';
+                            return `<div class="flex items-center gap-3 p-2 rounded-lg bg-white/5">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center ${bg}"><i class="fas fa-${icon}"></i></div>
+                                <div class="flex-1">
+                                    <div class="text-sm font-medium capitalize">${ev.type === 'submit' ? 'Credential Captured' : ev.type === 'click' ? 'Link Clicked' : 'Email Opened'}</div>
+                                    <div class="text-xs text-gray-500">${ev.browser || ''} ${ev.os || ''} ${ev.device || ''} ${ev.country ? '&#127758; ' + ev.country : ''} ${ev.city || ''}</div>
+                                    <div class="text-xs text-gray-500">${ev.ip ? 'IP: ' + ev.ip : ''} ${ev.isp ? '| ' + ev.isp : ''}</div>
+                                </div>
+                                <div class="text-xs text-gray-500">${ev.time ? new Date(ev.time).toLocaleString() : ''}</div>
+                            </div>`;
+                        }).join('')}
+                        ${(!s.events || s.events.length === 0) ? '<p class="text-center text-gray-500">No events</p>' : ''}
+                    </div>
+                </div>
+            </div>`, true);
+    }
+
+    // ========== CAMPAIGNS ==========
+    async function renderCampaigns(el) {
+        const campaigns = (await api('/api/campaigns')) || [];
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">Campaigns</h2><p class="text-gray-400 mt-1">Manage your phishing campaigns</p></div>
+                <button onclick="showCreateCampaign()" class="btn-primary px-4 md:px-6 py-2.5 rounded-lg font-medium text-sm md:text-base"><i class="fas fa-plus mr-2"></i>New Campaign</button>
+            </div>
+            <div class="glass rounded-xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[600px]">
+                        <thead><tr class="border-b border-white/10 text-left text-gray-400 text-sm">
+                            <th class="p-4">Name</th><th class="p-4">Status</th><th class="p-4">Sent</th><th class="p-4">Opened</th><th class="p-4">Clicked</th><th class="p-4">Submitted</th><th class="p-4">Actions</th>
+                        </tr></thead>
+                        <tbody>${campaigns.map(c => `
+                            <tr class="border-b border-white/5 hover:bg-white/5">
+                                <td class="p-4 font-medium">${c.name}</td>
+                                <td class="p-4"><span class="px-2 py-1 rounded-full text-xs ${statusColor(c.status)}">${c.status}</span></td>
+                                <td class="p-4">${c.total_sent}</td><td class="p-4">${c.total_opened}</td>
+                                <td class="p-4">${c.total_clicked}</td><td class="p-4 text-red-400 font-bold">${c.total_submitted}</td>
+                                <td class="p-4">
+                                    ${c.status === 'draft' ? `<button onclick="startCampaign(${c.id})" class="text-green-400 hover:text-green-300 mr-3" title="Start"><i class="fas fa-play"></i></button>` : ''}
+                                    ${c.status === 'running' ? `<button onclick="pauseCampaign(${c.id})" class="text-yellow-400 hover:text-yellow-300 mr-3" title="Pause"><i class="fas fa-pause"></i></button>` : ''}
+                                    ${c.status === 'paused' ? `<button onclick="startCampaign(${c.id})" class="text-green-400 hover:text-green-300 mr-3" title="Resume"><i class="fas fa-play"></i></button>` : ''}
+                                    <button onclick="viewTimeline(${c.id})" class="text-blue-400 hover:text-blue-300 mr-3" title="Timeline"><i class="fas fa-clock"></i></button>
+                                    <a href="/api/campaigns/${c.id}/report/pdf" target="_blank" class="text-red-400 hover:text-red-300 mr-2" title="PDF Report"><i class="fas fa-file-pdf"></i></a>
+                                    <a href="/api/campaigns/${c.id}/report/json" target="_blank" class="text-blue-400 hover:text-blue-300 mr-2" title="JSON Report"><i class="fas fa-file-code"></i></a>
+                                    <a href="/api/campaigns/${c.id}/report/csv" target="_blank" class="text-green-400 hover:text-green-300" title="CSV Report"><i class="fas fa-file-csv"></i></a>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ${campaigns.length === 0 ? '<div class="p-12 text-center text-gray-500"><i class="fas fa-rocket text-4xl mb-4"></i><p>No campaigns yet. Create your first one!</p></div>' : ''}
+            </div>`;
+    }
+
+    async function showCreateCampaign() {
+        const raw = await Promise.all([
+            api('/api/templates'), api('/api/landing-pages'), api('/api/smtp'), api('/api/groups'),
+        ]);
+        const [templates, landingPages, smtpConfigs, groups] = (raw || []).map(x => x || []);
+        showModal('New Campaign', `
+            <form onsubmit="createCampaign(event)" class="space-y-4">
+                <input id="camp-name" placeholder="Campaign Name" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><label class="text-sm text-gray-400 mb-1 block">Email Template *</label>
+                        <select id="camp-template" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white" required>
+                            ${templates.length === 0 ? '<option value="">No templates - create one first</option>' : ''}
+                            ${templates.map(t => `<option value="${t.id}">${t.name} [${t.severity}]</option>`).join('')}
+                        </select></div>
+                    <div><label class="text-sm text-gray-400 mb-1 block">SMTP Config *</label>
+                        <select id="camp-smtp" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white" required>
+                            ${smtpConfigs.length === 0 ? '<option value="">No SMTP - add one first</option>' : ''}
+                            ${smtpConfigs.map(c => `<option value="${c.id}">${c.name} (${c.from_email})</option>`).join('')}
+                        </select></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><label class="text-sm text-gray-400 mb-1 block">Landing Page</label>
+                        <select id="camp-landing" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white">
+                            <option value="">None</option>
+                            ${landingPages.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                        </select></div>
+                    <div><label class="text-sm text-gray-400 mb-1 block">Target Group *</label>
+                        <select id="camp-group" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white" required>
+                            ${groups.length === 0 ? '<option value="">No groups - create one first</option>' : ''}
+                            ${groups.map(g => `<option value="${g.id}">${g.name} (${g.recipient_count} recipients)</option>`).join('')}
+                        </select></div>
+                </div>
+                <div class="glass rounded-lg p-4 space-y-3">
+                    <h4 class="text-sm font-semibold text-gray-300"><i class="fas fa-cog mr-2"></i>Rotation & Timing</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div><label class="text-xs text-gray-400 mb-1 block">Min Delay (sec)</label><input id="camp-min-delay" type="number" value="3" class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm"></div>
+                        <div><label class="text-xs text-gray-400 mb-1 block">Max Delay (sec)</label><input id="camp-max-delay" type="number" value="8" class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm"></div>
+                        <div><label class="text-xs text-gray-400 mb-1 block">Subject Rot.</label><input id="camp-subj-rot" type="number" value="1" min="1" class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm"></div>
+                        <div><label class="text-xs text-gray-400 mb-1 block">FromName Rot.</label><input id="camp-name-rot" type="number" value="1" min="1" class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm"></div>
+                    </div>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="camp-letter-rot" class="w-4 h-4 accent-red-500">
+                            <span class="text-sm">Letter Rotation</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="camp-use-proxies" class="w-4 h-4 accent-red-500">
+                            <span class="text-sm">Use Proxies</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="camp-disclaimer" class="w-4 h-4 accent-red-500">
+                            <span class="text-sm">Add Disclaimer</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="glass rounded-lg p-4 space-y-3">
+                    <h4 class="text-sm font-semibold text-gray-300"><i class="fas fa-envelope-open-text mr-2"></i>Advanced Headers</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <input id="camp-reply-to" placeholder="Reply-To email" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm">
+                        <input id="camp-cc" placeholder="CC (comma separated)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm">
+                        <input id="camp-bcc" placeholder="BCC (comma separated)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm">
+                    </div>
+                </div>
+                <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium">Create Campaign</button>
+            </form>`, true);
+    }
+
+    async function createCampaign(e) {
+        e.preventDefault();
+        const templateId = document.getElementById('camp-template').value;
+        const smtpId = document.getElementById('camp-smtp').value;
+        const groupId = document.getElementById('camp-group').value;
+        if (!templateId || !smtpId || !groupId) { toast('Please fill Template, SMTP, and Group', 'error'); return; }
+        await api('/api/campaigns', 'POST', {
+            name: document.getElementById('camp-name').value,
+            template_id: parseInt(templateId),
+            landing_page_id: parseInt(document.getElementById('camp-landing').value) || null,
+            smtp_id: parseInt(smtpId),
+            group_id: parseInt(groupId),
+            use_proxies: document.getElementById('camp-use-proxies').checked,
+            settings: {
+                min_delay: parseInt(document.getElementById('camp-min-delay').value) || 3,
+                max_delay: parseInt(document.getElementById('camp-max-delay').value) || 8,
+                base_url: window.location.origin,
+            },
+            subject_rotation: parseInt(document.getElementById('camp-subj-rot').value) || 1,
+            fromname_rotation: parseInt(document.getElementById('camp-name-rot').value) || 1,
+            letter_rotation: document.getElementById('camp-letter-rot').checked,
+            reply_to: document.getElementById('camp-reply-to').value || null,
+            cc: document.getElementById('camp-cc').value || null,
+            bcc: document.getElementById('camp-bcc').value || null,
+            disclaimer_enabled: document.getElementById('camp-disclaimer').checked,
+            attachments: [],
+            custom_headers: {},
+        });
+        document.getElementById('modal').remove();
+        toast('Campaign created!');
+        showPage('campaigns');
+    }
+
+    async function startCampaign(id) { await api(`/api/campaigns/${id}/start`, 'POST'); toast('Campaign started!'); showPage('campaigns'); }
+    async function pauseCampaign(id) { await api(`/api/campaigns/${id}/pause`, 'POST'); toast('Campaign paused'); showPage('campaigns'); }
+
+    async function viewTimeline(id) {
+        const timeline = (await api(`/api/campaigns/${id}/timeline`)) || [];
+        showModal('Campaign Timeline', `
+            <div class="max-h-96 overflow-auto space-y-3">
+                ${timeline.map(t => `
+                    <div class="glass rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-medium">${t.email}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full ${statusColor(t.status)}">${t.status}</span>
+                        </div>
+                        <div class="flex gap-4 text-xs text-gray-400 flex-wrap">
+                            ${t.events.map(ev => `<span><i class="fas fa-${ev.event === 'sent' ? 'paper-plane' : ev.event === 'opened' ? 'envelope-open' : ev.event === 'clicked' ? 'mouse-pointer' : 'key'} mr-1"></i>${ev.event} <span class="text-gray-500">${new Date(ev.time).toLocaleTimeString()}</span></span>`).join('')}
+                        </div>
+                    </div>`).join('')}
+                ${timeline.length === 0 ? '<p class="text-center text-gray-500">No events yet</p>' : ''}
+            </div>`, true);
+    }
+
+    // ========== TEMPLATES ==========
+    async function renderTemplates(el) {
+        const templates = (await api('/api/templates')) || [];
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">Email Templates</h2><p class="text-gray-400 mt-1">Custom HTML emails — paste any design, full control</p></div>
+                <button onclick="showCreateTemplate()" class="btn-primary px-4 md:px-6 py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>New Template</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                ${templates.map(t => `
+                    <div class="glass rounded-xl p-6 hover:border-red-500/50 transition-all cursor-pointer" onclick="editTemplate(${t.id})">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center"><i class="fas fa-file-code text-purple-400"></i></div>
+                            <div class="flex-1"><h3 class="font-semibold">${t.name}</h3>
+                                <div class="flex items-center gap-2 mt-1">
+                                    <span class="text-xs text-gray-400">${t.category}</span>
+                                    <span class="text-xs px-2 py-0.5 rounded-full ${t.severity === 'Critical' ? 'bg-red-500/20 text-red-400' : t.severity === 'High' ? 'bg-orange-500/20 text-orange-400' : t.severity === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}">${t.severity}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-400 mb-2">Subject: ${t.subject}</p>
+                        <div class="flex flex-wrap gap-1 mb-2">${(t.tags || []).map(tag => `<span class="px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded text-xs">${tag}</span>`).join('')}</div>
+                        <div class="flex flex-wrap gap-1 mb-3">${(t.variables || []).map(v => `<span class="px-2 py-0.5 bg-white/10 rounded text-xs">##${v}##</span>`).join('')}</div>
+                        <div class="flex gap-2">
+                            <button onclick="event.stopPropagation();editTemplate(${t.id})" class="text-sm px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-edit mr-1"></i>Edit</button>
+                            <button onclick="event.stopPropagation();deleteTemplate(${t.id})" class="text-sm px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"><i class="fas fa-trash mr-1"></i>Delete</button>
+                        </div>
+                    </div>`).join('')}
+                ${templates.length === 0 ? '<div class="col-span-3 p-12 text-center text-gray-500"><i class="fas fa-file-code text-4xl mb-4"></i><p>No templates yet. Paste any HTML email design.</p></div>' : ''}
+            </div>`;
+    }
+
+    async function showCreateTemplate() {
+        showModal('New Email Template', `
+            <div class="space-y-4">
+                <form onsubmit="createTemplate(event)" class="space-y-3">
+                    <input id="tpl-name" placeholder="Template Name (e.g. IT Security Alert)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                    <input id="tpl-subject" placeholder="Subject Line — use ##email##, ##first_name##, ##link##, ##domain##, ##date## (use ; to separate subjects for rotation)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Category</label>
+                            <select id="tpl-category" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white">
+                                <option value="general">General</option>
+                                <option value="security">Security</option>
+                                <option value="collaboration">Collaboration</option>
+                                <option value="finance">Finance</option>
+                                <option value="business">Business</option>
+                                <option value="social">Social</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 mb-1 block">Severity</label>
+                            <select id="tpl-severity" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white">
+                                <option value="Low">Low</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="High">High</option>
+                                <option value="Critical">Critical</option>
+                            </select>
+                        </div>
+                    </div>
+                    <input id="tpl-tags" placeholder="Tags (comma separated) e.g. BEC, O365, urgent" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                    <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap gap-2">
+                            <span class="text-xs text-gray-400">Insert:</span>
+                            ${['email','first_name','last_name','link','domain','date'].map(v => `<button type="button" onclick="insertVar('tpl-html','##${v}##')" class="text-xs px-2 py-0.5 bg-white/10 rounded hover:bg-white/20">##${v}##</button>`).join('')}
+                        </div>
+                        <button type="button" onclick="document.getElementById('tpl-file').click()" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-upload mr-1"></i>Upload HTML</button>
+                        <input type="file" id="tpl-file" accept=".html,.htm,.mhtml" style="display:none" onchange="loadFileToField(this, 'tpl-html')">
+                    </div>
+                    <textarea id="tpl-html" placeholder="Paste your full HTML email here — or upload an HTML file above" rows="12" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm" oninput="previewTemplate()"></textarea>
+                    <div id="tpl-preview-container" class="hidden">
+                        <label class="text-xs text-gray-400 mb-1 block">Live Preview</label>
+                        <div class="preview-frame bg-white rounded-lg overflow-hidden min-h-[200px]"><iframe id="tpl-preview" class="w-full min-h-[200px] border-none"></iframe></div>
+                    </div>
+                    <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>Create Template</button>
+                </form>
+                <div class="border-t border-white/10 pt-4">
+                    <p class="text-sm text-gray-400 mb-3">Or start from a template:</p>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2" id="tpl-prebuilt-grid"></div>
+                </div>
+            </div>`, true);
+        const prebuilt = (await api('/api/templates/prebuilt/list')) || [];
+        document.getElementById('tpl-prebuilt-grid').innerHTML = prebuilt.map(t => `
+            <button onclick="useEmailTemplate('${t.name}')" class="glass rounded-lg p-3 text-left hover:border-red-500/50 transition-all text-sm">
+                <div class="font-medium">${t.name}</div>
+                <div class="text-xs text-gray-400 mt-1">${t.category}</div>
+            </button>`).join('');
+    }
+
+    function insertVar(fieldId, varName) {
+        const el = document.getElementById(fieldId);
+        el.value += varName;
+        el.focus();
+        previewTemplate();
+    }
+
+    function loadFileToField(input, fieldId) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById(fieldId).value = e.target.result;
+            if (fieldId === 'tpl-html') previewTemplate();
+            if (fieldId === 'tpl-edit-html') previewEditTemplate();
+            if (fieldId === 'lp-html') {
+                const frame = document.getElementById('lp-preview-frame');
+                const container = document.getElementById('lp-preview-container');
+                if (frame && container) { container.classList.remove('hidden'); frame.srcdoc = e.target.result; }
+            }
+            if (fieldId === 'lp-edit-html') {
+                const frame = document.getElementById('lp-edit-preview-frame');
+                const container = document.getElementById('lp-edit-preview-container');
+                if (frame && container) { container.classList.remove('hidden'); frame.srcdoc = e.target.result; }
+            }
+            toast('File loaded: ' + file.name);
+        };
+        reader.readAsText(file);
+        input.value = '';
+    }
+
+    function previewTemplate() {
+        const html = document.getElementById('tpl-html')?.value || '';
+        const container = document.getElementById('tpl-preview-container');
+        const frame = document.getElementById('tpl-preview');
+        if (html.trim() && container && frame) {
+            container.classList.remove('hidden');
+            frame.srcdoc = html;
+        } else if (container) {
+            container.classList.add('hidden');
+        }
+    }
+
+    async function useEmailTemplate(name) {
+        const t = await api(`/api/templates/prebuilt/${encodeURIComponent(name)}`);
+        document.getElementById('modal').remove();
+        showModal(`Use ${t.name}`, `
+            <form onsubmit="createFromEmailTemplate(event, '${t.name}')" class="space-y-4">
+                <div class="glass rounded-lg p-4"><div class="font-semibold mb-1">${t.name}</div><div class="text-sm text-gray-400">Subject: ${t.subject}</div>
+                    <div class="flex flex-wrap gap-1 mt-2">${(t.variables || []).map(v => `<span class="px-2 py-0.5 bg-white/10 rounded text-xs">##${v}##</span>`).join('')}</div></div>
+                <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium">Add to My Templates</button>
+            </form>`);
+    }
+
+    async function createFromEmailTemplate(e, name) {
+        e.preventDefault();
+        await api(`/api/templates/prebuilt/${encodeURIComponent(name)}/use`, 'POST');
+        document.getElementById('modal').remove();
+        toast('Template added!');
+        showPage('templates');
+    }
+
+    async function createTemplate(e) {
+        e.preventDefault();
+        await api('/api/templates', 'POST', {
+            name: document.getElementById('tpl-name').value,
+            subject: document.getElementById('tpl-subject').value,
+            html_body: document.getElementById('tpl-html').value,
+            category: document.getElementById('tpl-category').value,
+            severity: document.getElementById('tpl-severity').value,
+            tags: document.getElementById('tpl-tags').value.split(',').map(t => t.trim()).filter(t => t),
+        });
+        document.getElementById('modal').remove();
+        toast('Template created!');
+        showPage('templates');
+    }
+
+    async function editTemplate(id) {
+        const t = await api(`/api/templates/${id}`);
+        showModal('Edit Template', `
+            <form onsubmit="updateTemplate(event, ${id})" class="space-y-3">
+                <input id="tpl-name" value="${t.name}" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                <input id="tpl-subject" value="${t.subject}" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block">Category</label>
+                        <select id="tpl-category" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white">
+                            <option value="general" ${t.category === 'general' ? 'selected' : ''}>General</option>
+                            <option value="security" ${t.category === 'security' ? 'selected' : ''}>Security</option>
+                            <option value="collaboration" ${t.category === 'collaboration' ? 'selected' : ''}>Collaboration</option>
+                            <option value="finance" ${t.category === 'finance' ? 'selected' : ''}>Finance</option>
+                            <option value="business" ${t.category === 'business' ? 'selected' : ''}>Business</option>
+                            <option value="social" ${t.category === 'social' ? 'selected' : ''}>Social</option>
+                            <option value="custom" ${t.category === 'custom' ? 'selected' : ''}>Custom</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-400 mb-1 block">Severity</label>
+                        <select id="tpl-severity" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white">
+                            <option value="Low" ${t.severity === 'Low' ? 'selected' : ''}>Low</option>
+                            <option value="Medium" ${t.severity === 'Medium' ? 'selected' : ''}>Medium</option>
+                            <option value="High" ${t.severity === 'High' ? 'selected' : ''}>High</option>
+                            <option value="Critical" ${t.severity === 'Critical' ? 'selected' : ''}>Critical</option>
+                        </select>
+                    </div>
+                </div>
+                <input id="tpl-tags" value="${(t.tags || []).join(', ')}" placeholder="Tags (comma separated)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <div class="flex items-center justify-between">
+                    <div class="flex flex-wrap gap-2">
+                        <span class="text-xs text-gray-400">Insert:</span>
+                        ${['email','first_name','last_name','link','domain','date'].map(v => `<button type="button" onclick="insertVar('tpl-edit-html','##${v}##')" class="text-xs px-2 py-0.5 bg-white/10 rounded hover:bg-white/20">##${v}##</button>`).join('')}
+                    </div>
+                    <button type="button" onclick="document.getElementById('tpl-edit-file').click()" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-upload mr-1"></i>Upload HTML</button>
+                    <input type="file" id="tpl-edit-file" accept=".html,.htm,.mhtml" style="display:none" onchange="loadFileToField(this, 'tpl-edit-html')">
+                </div>
+                <textarea id="tpl-edit-html" rows="12" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm" oninput="previewEditTemplate()">${t.html_body || ''}</textarea>
+                <div id="tpl-edit-preview-container" class="${t.html_body ? '' : 'hidden'}">
+                    <label class="text-xs text-gray-400 mb-1 block">Live Preview</label>
+                    <div class="preview-frame bg-white rounded-lg overflow-hidden min-h-[200px]"><iframe id="tpl-edit-preview" class="w-full min-h-[200px] border-none" srcdoc="${(t.html_body || '').replace(/"/g, '&quot;')}"></iframe></div>
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 btn-primary py-2.5 rounded-lg font-medium">Update</button>
+                    <button type="button" onclick="deleteTemplate(${id})" class="px-4 py-2.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium">Delete</button>
+                </div>
+            </form>`, true);
+    }
+
+    function previewEditTemplate() {
+        const html = document.getElementById('tpl-edit-html')?.value || '';
+        const container = document.getElementById('tpl-edit-preview-container');
+        const frame = document.getElementById('tpl-edit-preview');
+        if (html.trim() && container && frame) {
+            container.classList.remove('hidden');
+            frame.srcdoc = html;
+        } else if (container) {
+            container.classList.add('hidden');
+        }
+    }
+
+    async function updateTemplate(e, id) {
+        e.preventDefault();
+        await api(`/api/templates/${id}`, 'PUT', {
+            name: document.getElementById('tpl-name').value,
+            subject: document.getElementById('tpl-subject').value,
+            html_body: document.getElementById('tpl-edit-html').value,
+            category: document.getElementById('tpl-category').value,
+            severity: document.getElementById('tpl-severity').value,
+            tags: document.getElementById('tpl-tags').value.split(',').map(t => t.trim()).filter(t => t),
+        });
+        document.getElementById('modal').remove();
+        toast('Template updated!');
+        showPage('templates');
+    }
+
+    async function deleteTemplate(id) {
+        if (!confirm('Delete this template?')) return;
+        await api(`/api/templates/${id}`, 'DELETE');
+        document.getElementById('modal').remove();
+        toast('Template deleted');
+        showPage('templates');
+    }
+
+    // ========== LANDING PAGES ==========
+    async function renderLandingPages(el) {
+        const pages = (await api('/api/landing-pages')) || [];
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">Landing Pages</h2><p class="text-gray-400 mt-1">Custom credential capture pages — paste any HTML, import any URL, full control</p></div>
+                <button onclick="showCreateLandingPage()" class="btn-primary px-4 md:px-6 py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>New Page</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                ${pages.map(p => `
+                    <div class="glass rounded-xl p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center"><i class="fas fa-globe text-green-400"></i></div>
+                            <div class="flex-1"><h3 class="font-semibold">${p.name}</h3><p class="text-xs text-gray-400 truncate">${p.url || 'Custom HTML'}</p></div>
+                        </div>
+                        <p class="text-sm text-gray-400 mb-3">Captures: ${(p.capture_fields || []).join(', ')}</p>
+                        ${p.redirect_url ? `<p class="text-xs text-gray-500 mb-3">Redirect: <span class="text-blue-400">${p.redirect_url}</span></p>` : ''}
+                        <div class="flex gap-2">
+                            <button onclick="editLandingPage(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-edit mr-1"></i>Edit</button>
+                            <button onclick="deleteLandingPage(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"><i class="fas fa-trash mr-1"></i>Delete</button>
+                        </div>
+                    </div>`).join('')}
+                ${pages.length === 0 ? '<div class="col-span-3 p-12 text-center text-gray-500"><i class="fas fa-globe text-4xl mb-4"></i><p>No landing pages yet. Create one from scratch, paste HTML, or import any URL.</p></div>' : ''}
+            </div>`;
+    }
+
+    async function deleteLandingPage(id) {
+        if (!confirm('Delete this landing page?')) return;
+        await api(`/api/landing-pages/${id}`, 'DELETE');
+        toast('Landing page deleted');
+        showPage('landing-pages');
+    }
+
+    async function showCreateLandingPage() {
+        showModal('New Landing Page', `
+            <div class="space-y-4">
+                <form onsubmit="createLandingPage(event)" class="space-y-3">
+                    <input id="lp-name" placeholder="Page Name (e.g. Office 365 Login)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                    <div class="flex gap-2">
+                        <input id="lp-url" placeholder="Import from URL (https://example.com/login)" class="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                        <button type="button" onclick="importLandingPageURL()" class="px-4 py-2.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 font-medium text-sm whitespace-nowrap"><i class="fas fa-download mr-1"></i>Fetch</button>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <button type="button" onclick="document.getElementById('lp-file').click()" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-upload mr-1"></i>Upload HTML File</button>
+                        <input type="file" id="lp-file" accept=".html,.htm,.mhtml" style="display:none" onchange="loadFileToField(this, 'lp-html')">
+                        <span class="text-xs text-gray-500">or paste HTML below</span>
+                    </div>
+                    <textarea id="lp-html" placeholder="Paste your HTML here — or upload an HTML file above" rows="12" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm"></textarea>
+                    <div id="lp-preview-container" class="hidden">
+                        <label class="text-xs text-gray-400 mb-1 block">Preview</label>
+                        <div class="preview-frame bg-white rounded-lg overflow-hidden min-h-[200px]"><iframe id="lp-preview-frame" class="w-full min-h-[200px] border-none"></iframe></div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <input id="lp-redirect" placeholder="Redirect URL after submit (optional)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                        <input id="lp-fields" placeholder="Capture fields (email,password)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" value="email,password">
+                    </div>
+                    <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>Create Landing Page</button>
+                </form>
+                <div class="border-t border-white/10 pt-4">
+                    <p class="text-sm text-gray-400 mb-3">Or start from a template:</p>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2" id="lp-templates-grid"></div>
+                </div>
+            </div>`, true);
+        const templates = (await api('/api/landing-pages/templates/list')) || [];
+        document.getElementById('lp-templates-grid').innerHTML = templates.map(t => `
+            <button onclick="useTemplate('${t.name}')" class="glass rounded-lg p-3 text-left hover:border-red-500/50 transition-all">
+                <div class="text-sm font-medium">${t.name}</div>
+                <div class="text-xs text-gray-400 mt-1">${t.description}</div>
+            </button>`).join('');
+        document.getElementById('lp-html').addEventListener('input', () => {
+            const html = document.getElementById('lp-html').value;
+            if (html.trim()) {
+                document.getElementById('lp-preview-container').classList.remove('hidden');
+                document.getElementById('lp-preview-frame').srcdoc = html;
+            } else {
+                document.getElementById('lp-preview-container').classList.add('hidden');
+            }
+        });
+    }
+
+    async function importLandingPageURL() {
+        const url = document.getElementById('lp-url').value;
+        if (!url) { toast('Enter a URL first', 'error'); return; }
+        toast('Fetching page...', 'info');
+        const r = await api('/api/landing-pages/import-url', 'POST', { url });
+        if (r.html_content) {
+            document.getElementById('lp-html').value = r.html_content;
+            document.getElementById('lp-preview-container').classList.remove('hidden');
+            document.getElementById('lp-preview-frame').srcdoc = r.html_content;
+            toast('Page fetched! Edit the HTML if needed.');
+        } else {
+            toast('Failed to fetch page', 'error');
+        }
+    }
+
+    async function useTemplate(name) {
+        const t = await api(`/api/landing-pages/templates/${encodeURIComponent(name)}`);
+        document.getElementById('modal').remove();
+        showModal(`Use ${t.name} Template`, `
+            <form onsubmit="createFromTemplate(event, '${t.name}')" class="space-y-4">
+                <div class="glass rounded-lg p-4"><div class="font-semibold mb-1">${t.name}</div><div class="text-xs text-gray-400">${t.description}</div>
+                    <div class="flex flex-wrap gap-1 mt-2">${(t.capture_fields || []).map(f => `<span class="px-2 py-0.5 bg-white/10 rounded text-xs">${f}</span>`).join('')}</div></div>
+                <input id="tpl-page-name" placeholder="Page Name (optional)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" value="${t.name}">
+                <input id="tpl-redirect" placeholder="Redirect URL after submit" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium">Create Landing Page</button>
+            </form>`);
+    }
+
+    async function createFromTemplate(e, name) {
+        e.preventDefault();
+        await api(`/api/landing-pages/templates/${encodeURIComponent(name)}/use`, 'POST', {
+            name: document.getElementById('tpl-page-name').value,
+            redirect_url: document.getElementById('tpl-redirect').value,
+        });
+        document.getElementById('modal').remove();
+        toast('Landing page created!');
+        showPage('landing-pages');
+    }
+
+    async function createLandingPage(e) {
+        e.preventDefault();
+        const fields = document.getElementById('lp-fields').value.split(',').map(f => f.trim()).filter(f => f);
+        await api('/api/landing-pages', 'POST', {
+            name: document.getElementById('lp-name').value,
+            url: document.getElementById('lp-url').value,
+            html_content: document.getElementById('lp-html').value,
+            redirect_url: document.getElementById('lp-redirect').value,
+            capture_fields: fields,
+        });
+        document.getElementById('modal').remove();
+        toast('Landing page created!');
+        showPage('landing-pages');
+    }
+
+    async function editLandingPage(id) {
+        const p = await api(`/api/landing-pages/${id}`);
+        showModal('Edit Landing Page', `
+            <form onsubmit="updateLandingPage(event, ${id})" class="space-y-3">
+                <input id="lp-edit-name" value="${p.name}" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                <input id="lp-edit-url" value="${p.url || ''}" placeholder="Source URL" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <div class="flex items-center justify-between">
+                    <button type="button" onclick="document.getElementById('lp-edit-file').click()" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-upload mr-1"></i>Upload HTML File</button>
+                    <input type="file" id="lp-edit-file" accept=".html,.htm,.mhtml" style="display:none" onchange="loadFileToField(this, 'lp-edit-html')">
+                </div>
+                <textarea id="lp-edit-html" rows="14" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm">${p.html_content || ''}</textarea>
+                <div id="lp-edit-preview-container" class="${p.html_content ? '' : 'hidden'}">
+                    <div class="preview-frame bg-white rounded-lg overflow-hidden min-h-[200px]"><iframe id="lp-edit-preview-frame" class="w-full min-h-[200px] border-none" srcdoc="${(p.html_content || '').replace(/"/g, '&quot;')}"></iframe></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <input id="lp-edit-redirect" value="${p.redirect_url || ''}" placeholder="Redirect URL after submit" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                    <input id="lp-edit-fields" value="${(p.capture_fields || []).join(',')}" placeholder="Capture fields" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 btn-primary py-2.5 rounded-lg font-medium">Update</button>
+                    <button type="button" onclick="deleteLandingPage(${id})" class="px-4 py-2.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium">Delete</button>
+                </div>
+            </form>`, true);
+        document.getElementById('lp-edit-html').addEventListener('input', () => {
+            const html = document.getElementById('lp-edit-html').value;
+            if (html.trim()) {
+                document.getElementById('lp-edit-preview-container').classList.remove('hidden');
+                document.getElementById('lp-edit-preview-frame').srcdoc = html;
+            } else {
+                document.getElementById('lp-edit-preview-container').classList.add('hidden');
+            }
+        });
+    }
+
+    async function updateLandingPage(e, id) {
+        e.preventDefault();
+        const fields = document.getElementById('lp-edit-fields').value.split(',').map(f => f.trim()).filter(f => f);
+        await api(`/api/landing-pages/${id}`, 'PUT', {
+            name: document.getElementById('lp-edit-name').value,
+            url: document.getElementById('lp-edit-url').value,
+            html_content: document.getElementById('lp-edit-html').value,
+            redirect_url: document.getElementById('lp-edit-redirect').value,
+            capture_fields: fields,
+        });
+        document.getElementById('modal').remove();
+        toast('Landing page updated!');
+        showPage('landing-pages');
+    }
+
+    // ========== GROUPS ==========
+    async function renderGroups(el) {
+        const groups = (await api('/api/groups')) || [];
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">Target Groups</h2><p class="text-gray-400 mt-1">Organize recipients into groups</p></div>
+                <button onclick="showCreateGroup()" class="btn-primary px-4 md:px-6 py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>New Group</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                ${groups.map(g => `
+                    <div class="glass rounded-xl p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:${g.color}20"><i class="fas fa-users" style="color:${g.color}"></i></div>
+                            <div><h3 class="font-semibold">${g.name}</h3><p class="text-xs text-gray-400">${g.recipient_count} recipients</p></div>
+                        </div>
+                        <p class="text-sm text-gray-400 mb-4">${g.description || 'No description'}</p>
+                        <div class="flex gap-2">
+                            <button onclick="showRecipients(${g.id})" class="flex-1 text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20"><i class="fas fa-user-plus mr-1"></i>Recipients</button>
+                            <button onclick="deleteGroup(${g.id})" class="text-sm px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>`).join('')}
+                ${groups.length === 0 ? '<div class="col-span-3 p-12 text-center text-gray-500"><i class="fas fa-users text-4xl mb-4"></i><p>No groups yet.</p></div>' : ''}
+            </div>`;
+    }
+
+    async function deleteGroup(id) {
+        if (!confirm('Delete this group and all recipients?')) return;
+        await api(`/api/groups/${id}`, 'DELETE');
+        toast('Group deleted');
+        showPage('groups');
+    }
+
+    async function showCreateGroup() {
+        showModal('New Target Group', `
+            <form onsubmit="createGroup(event)" class="space-y-4">
+                <input id="group-name" placeholder="Group Name" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                <input id="group-desc" placeholder="Description" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <div><label class="text-sm text-gray-400 mb-1 block">Color</label><input id="group-color" type="color" value="#3B82F6" class="w-full h-10 rounded-lg"></div>
+                <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium">Create Group</button>
+            </form>`);
+    }
+
+    async function createGroup(e) {
+        e.preventDefault();
+        await api('/api/groups', 'POST', {
+            name: document.getElementById('group-name').value,
+            description: document.getElementById('group-desc').value,
+            color: document.getElementById('group-color').value,
+        });
+        document.getElementById('modal').remove();
+        toast('Group created!');
+        showPage('groups');
+    }
+
+    async function showRecipients(groupId) {
+        const groups = (await api('/api/groups')) || [];
+        const group = groups.find(g => g.id === groupId);
+        const recipients = (await api(`/api/groups/${groupId}/recipients`)) || [];
+        showModal(`Recipients - ${group?.name || ''}`, `
+            <div class="space-y-4">
+                <form onsubmit="addRecipient(event, ${groupId})" class="flex gap-2">
+                    <input id="rec-email" type="email" placeholder="email@example.com" class="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm" required>
+                    <input id="rec-name" placeholder="First Name (optional)" class="w-36 bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-sm">
+                    <button type="submit" class="btn-primary px-4 py-2.5 rounded-lg text-sm"><i class="fas fa-plus"></i></button>
+                </form>
+                <div><label class="text-sm text-gray-400 mb-1 block">Bulk Import (CSV paste - one email per line, or email,first_name format)</label>
+                    <textarea id="rec-bulk" rows="4" placeholder="user1@example.com,John\nuser2@example.com,Jane\nuser3@example.com" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 font-mono text-sm"></textarea>
+                    <button onclick="bulkAddRecipients(${groupId})" class="mt-2 btn-success px-4 py-2 rounded-lg text-sm font-medium"><i class="fas fa-upload mr-1"></i>Import Bulk</button>
+                </div>
+                <div class="border-t border-white/10 pt-3">
+                    <div class="flex justify-between items-center mb-2"><span class="text-sm text-gray-400">${(recipients || []).length} recipients</span></div>
+                    <div class="max-h-64 overflow-auto space-y-2">
+                        ${(recipients || []).map(r => `
+                            <div class="glass rounded-lg px-4 py-2.5 flex justify-between items-center">
+                                <div><span class="text-sm">${r.email}</span>${r.first_name ? `<span class="text-xs text-gray-400 ml-2">${r.first_name}</span>` : ''}</div>
+                                <button onclick="deleteRecipient(${groupId}, ${r.id})" class="text-red-400 hover:text-red-300 text-sm"><i class="fas fa-times"></i></button>
+                            </div>`).join('')}
+                        ${(recipients || []).length === 0 ? '<p class="text-center text-gray-500 text-sm py-4">No recipients yet</p>' : ''}
+                    </div>
+                </div>
+            </div>`, true);
+    }
+
+    async function addRecipient(e, groupId) {
+        e.preventDefault();
+        await api(`/api/groups/${groupId}/recipients`, 'POST', {
+            email: document.getElementById('rec-email').value,
+            first_name: document.getElementById('rec-name').value,
+        });
+        toast('Recipient added!');
+        showRecipients(groupId);
+    }
+
+    async function bulkAddRecipients(groupId) {
+        const raw = document.getElementById('rec-bulk').value.trim();
+        if (!raw) { toast('Paste some emails first', 'error'); return; }
+        const lines = raw.split('\n').filter(l => l.trim());
+        let count = 0;
+        for (const line of lines) {
+            const parts = line.split(',').map(s => s.trim());
+            const email = parts[0];
+            if (!email || !email.includes('@')) continue;
+            await api(`/api/groups/${groupId}/recipients`, 'POST', {
+                email: email,
+                first_name: parts[1] || '',
+            });
+            count++;
+        }
+        toast(`${count} recipients imported!`);
+        showRecipients(groupId);
+    }
+
+    async function deleteRecipient(groupId, recipientId) {
+        await api(`/api/groups/${groupId}/recipients/${recipientId}`, 'DELETE');
+        showRecipients(groupId);
+    }
+
+    // ========== SMTP ==========
+    async function renderSMTP(el) {
+        const configs = (await api('/api/smtp')) || [];
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">SMTP Configurations</h2><p class="text-gray-400 mt-1">Manage email sending providers</p></div>
+                <div class="flex gap-2">
+                    <button onclick="showBulkImportSMTP()" class="glass px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-white/10"><i class="fas fa-upload mr-2 text-blue-400"></i>Bulk Import</button>
+                    <button onclick="validateAllSMTP()" class="glass px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-white/10"><i class="fas fa-check-double mr-2 text-green-400"></i>Validate All</button>
+                    <button onclick="showCreateSMTP()" class="btn-primary px-4 md:px-6 py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>New SMTP</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                ${configs.map(c => `
+                    <div class="glass rounded-xl p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center"><i class="fas fa-server text-blue-400"></i></div>
+                                <div><h3 class="font-semibold">${c.name}</h3><p class="text-xs text-gray-400">${c.provider} | ${c.host || 'API'} | ${c.profile_group}</p></div>
+                            </div>
+                            <span class="w-3 h-3 rounded-full ${c.is_healthy ? 'bg-green-400 pulse-dot' : 'bg-red-400'}"></span>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-400 mb-3">
+                            <span>${c.from_email}</span><span>${c.emails_sent}/${c.max_emails} sent</span>
+                        </div>
+                        <div class="w-full bg-white/10 rounded-full h-2 mb-4">
+                            <div class="bg-gradient-to-r from-red-500 to-pink-500 h-2 rounded-full" style="width:${c.max_emails > 0 ? (c.emails_sent/c.max_emails*100) : 0}%"></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="healthCheckSMTP(${c.id}, this)" class="text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20"><i class="fas fa-heartbeat mr-1"></i>Check</button>
+                            <button onclick="testSendSMTP(${c.id})" class="text-sm px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-paper-plane mr-1"></i>Test</button>
+                            <button onclick="deleteSMTP(${c.id})" class="text-sm px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"><i class="fas fa-trash mr-1"></i>Delete</button>
+                        </div>
+                    </div>`).join('')}
+                ${configs.length === 0 ? '<div class="col-span-2 p-12 text-center text-gray-500"><i class="fas fa-server text-4xl mb-4"></i><p>No SMTP configs yet.</p></div>' : ''}
+            </div>`;
+    }
+
+    const PROVIDER_DEFAULTS = {
+        custom:    { host: '', port: 587, tls: true },
+        office365: { host: 'smtp.office365.com', port: 587, tls: true },
+        gmail:     { host: 'smtp.gmail.com', port: 587, tls: true },
+        google_workspace: { host: 'smtp.google.com', port: 587, tls: true },
+        outlook:   { host: 'smtp-mail.outlook.com', port: 587, tls: true },
+        microsoft_365: { host: 'smtp.office365.com', port: 587, tls: true },
+        sendgrid:  { host: 'smtp.sendgrid.net', port: 587, tls: true },
+        aws_ses:   { host: 'email-smtp.us-east-1.amazonaws.com', port: 465, tls: false },
+        mailgun:   { host: 'smtp.mailgun.org', port: 587, tls: true },
+        postmark:  { host: 'smtp.postmarkapp.com', port: 587, tls: true },
+        sparkpost: { host: 'smtp.sparkpostmail.com', port: 587, tls: true },
+        mailchimp: { host: 'smtp.mailchimp.com', port: 587, tls: true },
+        zoho:      { host: 'smtp.zoho.com', port: 587, tls: true },
+        yandex:    { host: 'smtp.yandex.com', port: 465, tls: false },
+        mailtrap:  { host: 'smtp.mailtrap.io', port: 587, tls: true },
+        brevo:     { host: 'smtp-relay.brevo.com', port: 587, tls: true },
+        ionos:     { host: 'smtp.ionos.com', port: 587, tls: true },
+        godaddy:   { host: 'smtpout.secureserver.net', port: 465, tls: false },
+        namecheap: { host: 'mail.namecheap.com', port: 465, tls: false },
+        hostgator: { host: 'mail.hostgator.com', port: 465, tls: false },
+        bluehost:  { host: 'mail.bluehost.com', port: 465, tls: false },
+        siteground:{ host: 'mail.siteground.com', port: 465, tls: false },
+    };
+
+    function onProviderChange() {
+        const provider = document.getElementById('smtp-provider').value;
+        const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.custom;
+        document.getElementById('smtp-host').value = defaults.host;
+        document.getElementById('smtp-port').value = defaults.port;
+        document.getElementById('smtp-tls').value = defaults.tls ? 'true' : 'false';
+    }
+
+    function showCreateSMTP() {
+        showModal('New SMTP Configuration', `
+            <form onsubmit="createSMTP(event)" class="space-y-4">
+                <input id="smtp-name" placeholder="Config Name (e.g. Office365)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                <input id="smtp-profile" placeholder="Profile Group (e.g. default, clients, personal)" value="default" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <div><label class="text-sm text-gray-400 mb-1 block">Provider</label>
+                    <select id="smtp-provider" onchange="onProviderChange()" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white">
+                        <optgroup label="Microsoft">
+                            <option value="office365">Office 365 / Exchange Online</option>
+                            <option value="outlook">Outlook.com</option>
+                            <option value="microsoft_365">Microsoft 365 (SMTP)</option>
+                        </optgroup>
+                        <optgroup label="Google">
+                            <option value="gmail">Gmail</option>
+                            <option value="google_workspace">Google Workspace</option>
+                        </optgroup>
+                        <optgroup label="API Providers">
+                            <option value="sendgrid">SendGrid</option>
+                            <option value="aws_ses">Amazon SES</option>
+                            <option value="mailgun">Mailgun</option>
+                            <option value="postmark">Postmark</option>
+                            <option value="sparkpost">SparkPost</option>
+                            <option value="mailchimp">Mailchimp</option>
+                            <option value="brevo">Brevo (Sendinblue)</option>
+                        </optgroup>
+                        <optgroup label="Webmail">
+                            <option value="zoho">Zoho Mail</option>
+                            <option value="yandex">Yandex Mail</option>
+                        </optgroup>
+                        <optgroup label="Hosting">
+                            <option value="godaddy">GoDaddy</option>
+                            <option value="namecheap">Namecheap</option>
+                            <option value="hostgator">HostGator</option>
+                            <option value="bluehost">Bluehost</option>
+                            <option value="siteground">SiteGround</option>
+                            <option value="ionos">IONOS</option>
+                        </optgroup>
+                        <optgroup label="Testing">
+                            <option value="mailtrap">Mailtrap (Test)</option>
+                        </optgroup>
+                        <option value="custom">Custom SMTP</option>
+                    </select></div>
+                <input id="smtp-host" placeholder="SMTP Host" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-sm text-gray-400 mb-1 block">Port</label><input id="smtp-port" value="587" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5"></div>
+                    <div><label class="text-sm text-gray-400 mb-1 block">Security</label>
+                        <select id="smtp-tls" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white">
+                            <option value="true">STARTTLS (587)</option><option value="false">SSL (465)</option>
+                        </select></div>
+                </div>
+                <input id="smtp-username" placeholder="Username / Email" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <input id="smtp-password" type="password" placeholder="Password" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <div class="grid grid-cols-2 gap-4">
+                    <input id="smtp-from-email" placeholder="From Email" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                    <input id="smtp-from-name" placeholder="From Name" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                </div>
+                <input id="smtp-max" placeholder="Max Emails" value="500" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>Create & Validate SMTP</button>
+            </form>`);
+    }
+
+    async function createSMTP(e) {
+        e.preventDefault();
+        const data = {
+            name: document.getElementById('smtp-name').value,
+            provider: document.getElementById('smtp-provider').value,
+            host: document.getElementById('smtp-host').value,
+            port: parseInt(document.getElementById('smtp-port').value),
+            username: document.getElementById('smtp-username').value,
+            password: document.getElementById('smtp-password').value,
+            from_email: document.getElementById('smtp-from-email').value,
+            from_name: document.getElementById('smtp-from-name').value,
+            use_tls: document.getElementById('smtp-tls').value === 'true',
+            max_emails: parseInt(document.getElementById('smtp-max').value),
+            profile_group: document.getElementById('smtp-profile').value || 'default',
+        };
+        const result = await api('/api/smtp', 'POST', data);
+        document.getElementById('modal').remove();
+        if (result.id) {
+            toast('SMTP created! Validating connection...', 'info');
+            const health = await api(`/api/smtp/${result.id}/health`, 'POST');
+            if (health.healthy) {
+                toast(`SMTP validated! Connection OK (${health.latency}ms)`, 'success');
+            } else {
+                toast(`SMTP saved but connection failed: ${health.error || 'Unknown error'}`, 'warning');
+            }
+            showPage('smtp');
+        } else {
+            toast('Failed to create SMTP', 'error');
+        }
+    }
+
+    async function healthCheckSMTP(id, btn) {
+        btn.innerHTML = '<span class="spinner"></span>';
+        btn.disabled = true;
+        const r = await api(`/api/smtp/${id}/health`, 'POST');
+        btn.innerHTML = '<i class="fas fa-heartbeat mr-1"></i>Check';
+        btn.disabled = false;
+        if (r.healthy) {
+            toast(`Healthy! (${r.latency}ms)`);
+        } else {
+            toast(`Failed: ${r.error || 'Connection error'}`, 'error');
+        }
+        showPage('smtp');
+    }
+
+    async function deleteSMTP(id) {
+        if (!confirm('Delete this SMTP config?')) return;
+        await api(`/api/smtp/${id}`, 'DELETE');
+        toast('SMTP deleted');
+        showPage('smtp');
+    }
+
+    async function testSendSMTP(id) {
+        showModal('Test Send Email', `
+            <form onsubmit="doTestSend(event, ${id})" class="space-y-4">
+                <p class="text-sm text-gray-400">Send a test email to verify your SMTP configuration works.</p>
+                <input id="test-send-to" type="email" placeholder="your-email@gmail.com" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium"><i class="fas fa-paper-plane mr-2"></i>Send Test Email</button>
+            </form>`);
+    }
+
+    async function doTestSend(e, id) {
+        e.preventDefault();
+        const to = document.getElementById('test-send-to').value;
+        document.getElementById('modal').remove();
+        toast('Sending test email...', 'info');
+        const r = await api(`/api/smtp/${id}/test-send`, 'POST', { to_email: to });
+        if (r.success) {
+            toast(`Test email sent to ${to}!`);
+        } else {
+            toast(`Failed: ${r.error}`, 'error');
+        }
+    }
+
+    async function validateAllSMTP() {
+        toast('Validating all SMTP configs...', 'info');
+        const results = await api('/api/smtp/validate-all', 'POST');
+        let healthy = 0, failed = 0;
+        for (const r of results) {
+            if (r.healthy) healthy++;
+            else failed++;
+        }
+        if (failed === 0) {
+            toast(`All ${healthy} SMTP configs are healthy!`);
+        } else {
+            toast(`${healthy} healthy, ${failed} failed — check SMTP cards`, 'warning');
+        }
+        showPage('smtp');
+    }
+
+    function showBulkImportSMTP() {
+        showModal('Bulk Import SMTP Configs', `
+            <div class="space-y-4">
+                <div class="glass rounded-lg p-4">
+                    <h4 class="font-semibold mb-2">Supported Formats</h4>
+                    <div class="space-y-1 text-xs text-gray-400 font-mono">
+                        <p><span class="text-green-400">host|user|pass||from@email.com</span></p>
+                        <p><span class="text-green-400">host|user|pass|from@email.com</span></p>
+                        <p><span class="text-green-400">host|user|pass</span></p>
+                        <p><span class="text-blue-400">host:user{password</span></p>
+                        <p><span class="text-blue-400">host user pass</span></p>
+                        <p><span class="text-blue-400">host, user, pass</span></p>
+                        <p><span class="text-gray-500"># Lines starting with # are ignored</span></p>
+                    </div>
+                </div>
+                <textarea id="bulk-smtp-input" rows="12" placeholder="smtp.office365.com|user@company.com|MyPass123||user@company.com
+smtp.gmail.com|you@gmail.com|app-password-here
+smtp.sendgrid.net|apikey|SG.xxx
+mail.example.com:465:user1{Pass123
+
+# One per line, paste your SMTP configs below:" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm"></textarea>
+                <div class="flex justify-between items-center">
+                    <span id="bulk-smtp-count" class="text-sm text-gray-400">0 configs</span>
+                    <button onclick="doBulkImportSMTP()" class="btn-primary px-6 py-2.5 rounded-lg font-medium"><i class="fas fa-upload mr-2"></i>Import All</button>
+                </div>
+            </div>`, true);
+
+        const textarea = document.getElementById('bulk-smtp-input');
+        textarea.addEventListener('input', () => {
+            const lines = textarea.value.trim().split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+            document.getElementById('bulk-smtp-count').textContent = lines.length + ' configs';
+        });
+    }
+
+    async function doBulkImportSMTP() {
+        const raw = document.getElementById('bulk-smtp-input').value;
+        if (!raw.trim()) { toast('Paste some SMTP configs first', 'error'); return; }
+        document.getElementById('modal').remove();
+        toast('Importing SMTP configs...', 'info');
+        const r = await api('/api/smtp/bulk-import', 'POST', { configs: raw });
+        if (r.imported > 0) {
+            toast(`Imported ${r.imported} SMTP configs!${r.skipped > 0 ? ` (${r.skipped} skipped)` : ''}`);
+        } else {
+            toast('No configs could be parsed. Check the format.', 'error');
+        }
+        showPage('smtp');
+    }
+
+    // ========== PROXIES ==========
+    async function renderProxies(el) {
+        const proxies = (await api('/api/proxies')) || [];
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">Proxy Rotator</h2><p class="text-gray-400 mt-1">Rotate proxies per send — HTTP, HTTPS, SOCKS4, SOCKS5</p></div>
+                <div class="flex gap-2">
+                    <button onclick="showBulkImportProxies()" class="glass px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-white/10"><i class="fas fa-upload mr-2 text-blue-400"></i>Bulk Import</button>
+                    <button onclick="testAllProxies()" class="glass px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-white/10"><i class="fas fa-check-double mr-2 text-green-400"></i>Test All</button>
+                    <button onclick="showCreateProxy()" class="btn-primary px-4 md:px-6 py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>New Proxy</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                ${proxies.map(p => `
+                    <div class="glass rounded-xl p-6">
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-lg ${p.is_healthy ? 'bg-green-500/20' : 'bg-red-500/20'} flex items-center justify-center">
+                                <i class="fas fa-shield-halved ${p.is_healthy ? 'text-green-400' : 'text-red-400'}"></i>
+                            </div>
+                            <div class="flex-1"><h3 class="font-semibold">${p.name}</h3>
+                                <p class="text-xs text-gray-400">${p.proxy_type.toUpperCase()}://${p.host}:${p.port}</p></div>
+                            <span class="px-2 py-0.5 rounded-full text-xs ${p.is_active ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}">${p.is_active ? 'Active' : 'Disabled'}</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+                            <div class="bg-white/5 rounded-lg p-2"><p class="text-xs text-gray-400">Uses</p><p class="font-bold">${p.total_uses}</p></div>
+                            <div class="bg-white/5 rounded-lg p-2"><p class="text-xs text-gray-400">Fails</p><p class="font-bold ${p.total_failures > 0 ? 'text-red-400' : ''}">${p.total_failures}</p></div>
+                            <div class="bg-white/5 rounded-lg p-2"><p class="text-xs text-gray-400">Latency</p><p class="font-bold">${p.avg_latency}ms</p></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="testProxy(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30"><i class="fas fa-play mr-1"></i>Test</button>
+                            <button onclick="deleteProxy(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"><i class="fas fa-trash mr-1"></i>Delete</button>
+                        </div>
+                    </div>`).join('')}
+                ${proxies.length === 0 ? '<div class="col-span-3 p-12 text-center text-gray-500"><i class="fas fa-shield-halved text-4xl mb-4"></i><p>No proxies yet. Add proxies to rotate your SMTP connections.</p></div>' : ''}
+            </div>`;
+    }
+
+    async function showCreateProxy() {
+        showModal('New Proxy', `
+            <form onsubmit="createProxy(event)" class="space-y-3">
+                <input id="proxy-name" placeholder="Proxy Name (e.g. US Residential 1)" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                <div class="grid grid-cols-3 gap-3">
+                    <div><label class="text-xs text-gray-400 mb-1 block">Type</label>
+                        <select id="proxy-type" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white">
+                            <option value="http">HTTP</option>
+                            <option value="https">HTTPS</option>
+                            <option value="socks5">SOCKS5</option>
+                            <option value="socks4">SOCKS4</option>
+                        </select></div>
+                    <div><label class="text-xs text-gray-400 mb-1 block">Host</label><input id="proxy-host" placeholder="127.0.0.1" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required></div>
+                    <div><label class="text-xs text-gray-400 mb-1 block">Port</label><input id="proxy-port" type="number" placeholder="8080" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <input id="proxy-user" placeholder="Username (optional)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                    <input id="proxy-pass" placeholder="Password (optional)" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                </div>
+                <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>Create Proxy</button>
+            </form>`);
+    }
+
+    async function createProxy(e) {
+        e.preventDefault();
+        const r = await api('/api/proxies', 'POST', {
+            name: document.getElementById('proxy-name').value,
+            proxy_type: document.getElementById('proxy-type').value,
+            host: document.getElementById('proxy-host').value,
+            port: parseInt(document.getElementById('proxy-port').value),
+            username: document.getElementById('proxy-user').value,
+            password: document.getElementById('proxy-pass').value,
+        });
+        document.getElementById('modal').remove();
+        toast('Proxy created!');
+        showPage('proxies');
+    }
+
+    async function testProxy(id) {
+        toast('Testing proxy...', 'info');
+        const r = await api(`/api/proxies/${id}/test`, 'POST');
+        if (r.healthy) {
+            toast(`Proxy working! Latency: ${r.latency}ms via ${r.proxy_type}`);
+        } else {
+            toast(`Proxy failed: ${r.error}`, 'error');
+        }
+        showPage('proxies');
+    }
+
+    async function testAllProxies() {
+        toast('Testing all proxies...', 'info');
+        const r = await api('/api/proxies/test-all', 'POST');
+        let healthy = 0, failed = 0;
+        for (const p of r) { if (p.healthy) healthy++; else failed++; }
+        toast(`${healthy} healthy, ${failed} failed`);
+        showPage('proxies');
+    }
+
+    async function deleteProxy(id) {
+        if (!confirm('Delete this proxy?')) return;
+        await api(`/api/proxies/${id}`, 'DELETE');
+        toast('Proxy deleted');
+        showPage('proxies');
+    }
+
+    function showBulkImportProxies() {
+        showModal('Bulk Import Proxies', `
+            <div class="space-y-4">
+                <div class="glass rounded-lg p-4">
+                    <h4 class="font-semibold mb-2">Supported Formats</h4>
+                    <div class="space-y-1 text-xs text-gray-400 font-mono">
+                        <p><span class="text-green-400">http://user:pass@host:port</span></p>
+                        <p><span class="text-green-400">socks5://host:port</span></p>
+                        <p><span class="text-green-400">socks5://user:pass@host:port</span></p>
+                        <p><span class="text-blue-400">host:port:user:pass</span></p>
+                        <p><span class="text-blue-400">host:port</span></p>
+                        <p><span class="text-blue-400">type|host|port|user|pass</span></p>
+                        <p><span class="text-gray-500"># Lines starting with # are ignored</span></p>
+                    </div>
+                </div>
+                <textarea id="bulk-proxy-input" rows="12" placeholder="socks5://user:pass@192.168.1.1:1080
+http://proxy.example.com:8080:user:pass
+192.168.1.1:1080:user:pass
+socks4|proxy.example.com|1080||
+
+# One per line, paste your proxies below:" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm"></textarea>
+                <div class="flex justify-between items-center">
+                    <span id="bulk-proxy-count" class="text-sm text-gray-400">0 proxies</span>
+                    <button onclick="doBulkImportProxies()" class="btn-primary px-6 py-2.5 rounded-lg font-medium"><i class="fas fa-upload mr-2"></i>Import All</button>
+                </div>
+            </div>`, true);
+        document.getElementById('bulk-proxy-input').addEventListener('input', function() {
+            const lines = this.value.trim().split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+            document.getElementById('bulk-proxy-count').textContent = lines.length + ' proxies';
+        });
+    }
+
+    async function doBulkImportProxies() {
+        const raw = document.getElementById('bulk-proxy-input').value;
+        if (!raw.trim()) { toast('Paste some proxies first', 'error'); return; }
+        document.getElementById('modal').remove();
+        toast('Importing proxies...', 'info');
+        const r = await api('/api/proxies/bulk-import', 'POST', { proxies: raw });
+        if (r.imported > 0) {
+            toast(`Imported ${r.imported} proxies!${r.skipped > 0 ? ` (${r.skipped} skipped)` : ''}`);
+        } else {
+            toast('No proxies parsed. Check the format.', 'error');
+        }
+        showPage('proxies');
+    }
+
+    // ========== ABOUT ==========
+    async function renderAbout(el) {
+        el.innerHTML = `
+            <div class="max-w-4xl mx-auto">
+                <div class="text-center mb-8 md:mb-12">
+                    <img src="assets/logo.png" alt="HawkPhish" class="w-20 h-20 md:w-24 md:h-24 rounded-2xl mx-auto mb-4 md:mb-6 glow object-cover">
+                    <h1 class="text-3xl md:text-4xl font-bold mb-2">HawkPhish</h1>
+                    <p class="text-gray-400 text-base md:text-lg">Advanced Phishing Simulation Platform</p>
+                    <p class="text-gray-500 text-sm mt-2">Version 1.2.0</p>
+                </div>
+
+                <div class="glass rounded-2xl p-5 md:p-8 mb-4 md:mb-6">
+                    <h2 class="text-lg md:text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-shield-halved text-red-400"></i> Purpose</h2>
+                    <p class="text-gray-300 leading-relaxed text-sm md:text-base">HawkPhish is an authorized phishing simulation platform built for red team operations and security awareness training. It enables organizations to test their human defenses against social engineering attacks in a controlled, ethical environment.</p>
+                    <div class="mt-4 p-3 md:p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                        <p class="text-yellow-400 text-xs md:text-sm"><i class="fas fa-exclamation-triangle mr-2"></i><strong>Warning:</strong> This tool is for authorized security testing only. Unauthorized use is illegal and unethical. Always obtain written permission before conducting phishing simulations.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-4 md:mb-6">
+                    <div class="glass rounded-2xl p-5 md:p-6">
+                        <h3 class="font-semibold mb-4 flex items-center gap-2 text-base"><i class="fas fa-bolt text-yellow-400"></i> Features</h3>
+                        <ul class="space-y-2 text-sm text-gray-300">
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-0.5"></i>Multi-provider SMTP support (25+ providers)</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-0.5"></i>12 pre-built landing page templates</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-0.5"></i>6 pre-built email templates</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-0.5"></i>Real-time tracking (opens, clicks, credentials)</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-0.5"></i>IP geolocation & browser/OS detection</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-0.5"></i>Per-target session timeline</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-0.5"></i>Proxy rotation (HTTP/HTTPS/SOCKS4/SOCKS5)</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-0.5"></i>Bulk import (SMTP, proxies, recipients)</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-0.5"></i>PDF report export</li>
+                            <li class="flex items-start gap-2"><i class="fas fa-check text-green-400 mt-0.5"></i>Upload HTML files for templates & landing pages</li>
+                        </ul>
+                    </div>
+                    <div class="glass rounded-2xl p-5 md:p-6">
+                        <h3 class="font-semibold mb-4 flex items-center gap-2 text-base"><i class="fas fa-server text-blue-400"></i> Supported SMTP Providers</h3>
+                        <ul class="space-y-2 text-sm text-gray-300">
+                            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></span>Office 365 / Exchange Online</li>
+                            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></span>Gmail / Google Workspace</li>
+                            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></span>SendGrid / Mailgun / Postmark</li>
+                            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></span>Amazon SES / SparkPost</li>
+                            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></span>Zoho / Yandex / Brevo</li>
+                            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></span>HostGator / Bluehost / SiteGround</li>
+                            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></span>GoDaddy / Namecheap / IONOS</li>
+                            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></span>Mailtrap (testing)</li>
+                            <li class="flex items-center gap-2"><span class="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></span>Any custom SMTP server</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="glass rounded-2xl p-5 md:p-8 mb-4 md:mb-6">
+                    <h2 class="text-lg md:text-xl font-bold mb-4 md:mb-6 flex items-center gap-2"><i class="fas fa-coins text-yellow-400"></i> Support / Donate</h2>
+                    <p class="text-gray-400 text-sm mb-4">If this tool helped you, consider supporting development. Any amount helps keep the project alive.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="glass rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center"><i class="fas fa-coins text-yellow-400 text-sm"></i></div>
+                                <div><p class="font-semibold text-sm">USDT (TRC20)</p><p class="text-xs text-gray-500">Binance ID: 893759503</p></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <code class="text-xs text-gray-300 bg-white/5 px-2 py-1 rounded flex-1 truncate">TNweg4pBxgtABK6g1Jb6isrn3PZawEizVJ</code>
+                                <button onclick="copyAddr('TNweg4pBxgtABK6g1Jb6isrn3PZawEizVJ', this)" class="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white flex-shrink-0"><i class="fas fa-copy"></i></button>
+                            </div>
+                        </div>
+                        <div class="glass rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center"><i class="fab fa-bitcoin text-orange-400 text-sm"></i></div>
+                                <div><p class="font-semibold text-sm">BTC (Bitcoin)</p><p class="text-xs text-gray-500">Bitcoin Network</p></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <code class="text-xs text-gray-300 bg-white/5 px-2 py-1 rounded flex-1 truncate">13JxhEWzo21jcpbiyL8hvemeKEmXcrY7G2</code>
+                                <button onclick="copyAddr('13JxhEWzo21jcpbiyL8hvemeKEmXcrY7G2', this)" class="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white flex-shrink-0"><i class="fas fa-copy"></i></button>
+                            </div>
+                        </div>
+                        <div class="glass rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center"><i class="fab fa-ethereum text-blue-400 text-sm"></i></div>
+                                <div><p class="font-semibold text-sm">ETH (ERC20)</p><p class="text-xs text-gray-500">Ethereum Network</p></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <code class="text-xs text-gray-300 bg-white/5 px-2 py-1 rounded flex-1 truncate">13JxhEWzo21jcpbiyL8hvemeKEmXcrY7G2</code>
+                                <button onclick="copyAddr('13JxhEWzo21jcpbiyL8hvemeKEmXcrY7G2', this)" class="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white flex-shrink-0"><i class="fas fa-copy"></i></button>
+                            </div>
+                        </div>
+                        <div class="glass rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center"><i class="fas fa-b text-yellow-400 text-sm font-bold"></i></div>
+                                <div><p class="font-semibold text-sm">BNB (BEP20)</p><p class="text-xs text-gray-500">BSC Network</p></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <code class="text-xs text-gray-300 bg-white/5 px-2 py-1 rounded flex-1 truncate">0x0874626d93936f3e17591f10cfe5355e5fd7fcce</code>
+                                <button onclick="copyAddr('0x0874626d93936f3e17591f10cfe5355e5fd7fcce', this)" class="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white flex-shrink-0"><i class="fas fa-copy"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass rounded-2xl p-5 md:p-8 mb-4 md:mb-6">
+                    <h2 class="text-lg md:text-xl font-bold mb-4 md:mb-6 flex items-center gap-2"><i class="fas fa-user-secret text-red-400"></i> Created By</h2>
+                    <div class="text-center">
+                        <h3 class="text-xl md:text-2xl font-bold">Qasim Ali</h3>
+                        <p class="text-gray-400 mb-4 text-sm md:text-base">Security Researcher & Red Team Operator</p>
+                        <div class="flex flex-wrap justify-center gap-3">
+                            <a href="mailto:qasim.sec1401@proton.me" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all text-sm font-medium">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 2c1.93 0 3.68.68 5.05 1.81L12 10.86 6.95 5.81A7.96 7.96 0 0112 4zm-8 8c0-1.38.34-2.68.94-3.81L8.34 13.1A5.97 5.97 0 006 16a6 6 0 00-2-4zm8 8c-1.93 0-3.68-.68-5.05-1.81L12 13.14l5.05 5.05A7.96 7.96 0 0112 20zm8-4c0 1.38-.34 2.68-.94 3.81l-3.39-3.1A5.97 5.97 0 0018 14a6 6 0 002-4z"/></svg>
+                                ProtonMail
+                            </a>
+                            <a href="https://github.com/QASIM1401/reconpro" target="_blank" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-500/20 text-gray-300 hover:bg-gray-500/30 transition-all text-sm font-medium">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                                GitHub
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass rounded-2xl p-5 md:p-8 mb-4 md:mb-6">
+                    <h2 class="text-lg md:text-xl font-bold mb-4 flex items-center gap-2"><i class="fas fa-bug text-red-400"></i> Report Issues</h2>
+                    <p class="text-gray-300 mb-4 text-sm">Found a bug, error, or SMTP not working? Report it and I'll fix it.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                        <a href="mailto:qasim.sec1401@proton.me?subject=HawkPhish%20Bug%20Report" class="flex items-center gap-3 glass rounded-xl p-4 hover:border-red-500/50 transition-all">
+                            <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="#60a5fa"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 2c1.93 0 3.68.68 5.05 1.81L12 10.86 6.95 5.81A7.96 7.96 0 0112 4z"/></svg>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="font-semibold text-sm">Email via ProtonMail</div>
+                                <div class="text-xs text-gray-400 truncate">qasim.sec1401@proton.me</div>
+                            </div>
+                        </a>
+                        <a href="https://github.com/QASIM1401/reconpro/issues" target="_blank" class="flex items-center gap-3 glass rounded-xl p-4 hover:border-red-500/50 transition-all">
+                            <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gray-500/20 flex items-center justify-center flex-shrink-0">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="#9ca3af"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="font-semibold text-sm">GitHub Issues</div>
+                                <div class="text-xs text-gray-400">Report bugs & feature requests</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function copyAddr(addr, btn) {
+        navigator.clipboard.writeText(addr).then(() => {
+            const icon = btn.querySelector('i');
+            icon.className = 'fas fa-check text-green-400';
+            setTimeout(() => { icon.className = 'fas fa-copy'; }, 1500);
+            toast('Address copied!');
+        });
+    }
+
+    // ========== INIT ==========
+    showPage('dashboard');
+    </script>
+</body>
+</html>
