@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 from contextlib import asynccontextmanager
 from database import init_db, get_db
-from routes import smtp, campaigns, templates, groups, tracking, landing_pages, proxies, smtp_server, audit_logs, external
+from routes import smtp, campaigns, templates, groups, tracking, landing_pages, proxies, smtp_server, audit_logs, external, analytics, validation, webhooks, payloads, screenshots
 import os
 
 @asynccontextmanager
@@ -39,6 +39,17 @@ app.include_router(proxies.router)
 app.include_router(smtp_server.router)
 app.include_router(audit_logs.router)
 app.include_router(external.router)
+app.include_router(analytics.router)
+app.include_router(validation.router)
+app.include_router(webhooks.router)
+app.include_router(payloads.router)
+app.include_router(screenshots.router)
+
+
+@app.get("/payloads/{token}/download")
+async def payload_download_alias(token: str):
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=f"/api/payloads/{token}/download")
 
 
 @app.get("/api/health")
@@ -61,4 +72,38 @@ if os.path.exists(frontend_path):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import ssl
+    import sys
+    import asyncio
+
+    # Playwright (and other subprocess-based tools) require ProactorEventLoop on Windows
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+    # Check for HTTPS configuration
+    cert_file = os.getenv("SSL_CERT_FILE")
+    key_file = os.getenv("SSL_KEY_FILE")
+    port = int(os.getenv("PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+    
+    ssl_context = None
+    if cert_file and key_file:
+        if os.path.exists(cert_file) and os.path.exists(key_file):
+            ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ssl_context.load_cert_chain(cert_file, key_file)
+            print(f"[HTTPS] enabled on {host}:{port}")
+        else:
+            print(f"[WARN] SSL cert/key not found: {cert_file}, {key_file}")
+            print("   Starting in HTTP mode")
+    else:
+        print(f"[HTTP] mode on {host}:{port}")
+        print("   Set SSL_CERT_FILE and SSL_KEY_FILE env vars for HTTPS")
+    
+    uvicorn.run(
+        "main:app",
+        host=host,
+        port=port,
+        reload=True,
+        ssl_keyfile=key_file if ssl_context else None,
+        ssl_certfile=cert_file if ssl_context else None,
+    )

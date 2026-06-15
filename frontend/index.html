@@ -74,6 +74,8 @@
                 <a href="#" onclick="showPage('smtp-server')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-server w-5"></i>SMTP Server</a>
                 <a href="#" onclick="showPage('audit-logs')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-clipboard-list w-5"></i>Audit Logs</a>
                 <a href="#" onclick="showPage('integrations')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-plug w-5"></i>Integrations</a>
+                <a href="#" onclick="showPage('analytics')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-chart-line w-5"></i>Analytics</a>
+                <a href="#" onclick="showPage('tools')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-toolbox w-5"></i>Tools</a>
                 <div class="border-t border-white/10 my-2"></div>
                 <a href="#" onclick="showPage('about')" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-sm"><i class="fas fa-info-circle w-5"></i>About</a>
             </nav>
@@ -160,6 +162,8 @@
             case 'smtp-server': return renderSMTPServer(el);
             case 'audit-logs': return renderAuditLogs(el);
             case 'integrations': return renderIntegrations(el);
+            case 'analytics': return renderAnalytics(el);
+            case 'tools': return renderTools(el);
             case 'about': return renderAbout(el);
         }
     }
@@ -570,7 +574,10 @@
                     </div>
                     <textarea id="tpl-html" placeholder="Paste your full HTML email here — or upload an HTML file above" rows="12" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm" oninput="previewTemplate()"></textarea>
                     <div id="tpl-preview-container" class="hidden">
-                        <label class="text-xs text-gray-400 mb-1 block">Live Preview</label>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-xs text-gray-400 block">Live Preview</label>
+                            <button type="button" onclick="openEmailClientPreview('tpl-html')" class="text-xs px-2 py-1 rounded bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"><i class="fas fa-envelope-open mr-1"></i>Email Client Preview</button>
+                        </div>
                         <div class="preview-frame bg-white rounded-lg overflow-hidden min-h-[200px]"><iframe id="tpl-preview" class="w-full min-h-[200px] border-none"></iframe></div>
                     </div>
                     <button type="submit" class="w-full btn-primary py-2.5 rounded-lg font-medium"><i class="fas fa-plus mr-2"></i>Create Template</button>
@@ -705,7 +712,10 @@
                 </div>
                 <textarea id="tpl-edit-html" rows="12" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 font-mono text-sm" oninput="previewEditTemplate()">${t.html_body || ''}</textarea>
                 <div id="tpl-edit-preview-container" class="${t.html_body ? '' : 'hidden'}">
-                    <label class="text-xs text-gray-400 mb-1 block">Live Preview</label>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-xs text-gray-400 block">Live Preview</label>
+                        <button type="button" onclick="openEmailClientPreview('tpl-edit-html')" class="text-xs px-2 py-1 rounded bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"><i class="fas fa-envelope-open mr-1"></i>Email Client Preview</button>
+                    </div>
                     <div class="preview-frame bg-white rounded-lg overflow-hidden min-h-[200px]"><iframe id="tpl-edit-preview" class="w-full min-h-[200px] border-none" srcdoc="${(t.html_body || '').replace(/"/g, '&quot;')}"></iframe></div>
                 </div>
                 <div class="flex gap-2">
@@ -774,6 +784,7 @@
                             <button onclick="editLandingPage(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"><i class="fas fa-edit mr-1"></i>Edit</button>
                             <button onclick="manageLandingPageFiles(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"><i class="fas fa-folder-open mr-1"></i>Files</button>
                             <button onclick="previewLandingPage(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30"><i class="fas fa-eye mr-1"></i>Preview</button>
+                            <button onclick="screenshotLandingPage(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30"><i class="fas fa-camera mr-1"></i>Screenshot</button>
                             <button onclick="deleteLandingPage(${p.id})" class="text-sm px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"><i class="fas fa-trash mr-1"></i></button>
                         </div>
                     </div>`).join('')}
@@ -790,6 +801,27 @@
 
     async function previewLandingPage(id) {
         window.open(`/lp/${id}?tracking_id=preview`, '_blank');
+    }
+
+    async function screenshotLandingPage(id) {
+        window.open(`/api/screenshots/landing-page/${id}`, '_blank');
+    }
+
+    function openEmailClientPreview(textareaId) {
+        const html = document.getElementById(textareaId)?.value || '';
+        if (!html.trim()) { toast('Enter HTML first'); return; }
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/api/screenshots/email-preview';
+        form.target = '_blank';
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'html';
+        input.value = html;
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
     }
 
     async function manageLandingPageFiles(id) {
@@ -1781,6 +1813,264 @@ socks4|proxy.example.com|1080||
             toast('No proxies parsed. Check the format.', 'error');
         }
         showPage('proxies');
+    }
+
+    // ========== ANALYTICS ==========
+    async function renderAnalytics(el) {
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">Analytics</h2><p class="text-gray-400 mt-1">Heatmaps, timing analytics, repeat victims, and campaign filters</p></div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-lg font-bold mb-4"><i class="fas fa-fire mr-2 text-orange-400"></i>Geolocation Heatmap</h3>
+                    <div id="heatmap-loading" class="text-gray-400 text-sm">Click load to fetch heatmap data</div>
+                    <div id="heatmap-data" class="space-y-2 max-h-64 overflow-y-auto hidden"></div>
+                    <button onclick="loadHeatmap()" class="mt-4 btn-primary px-4 py-2 rounded-lg text-sm"><i class="fas fa-sync-alt mr-2"></i>Load Heatmap</button>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-lg font-bold mb-4"><i class="fas fa-clock mr-2 text-blue-400"></i>Time-to-Click</h3>
+                    <div id="ttc-loading" class="text-gray-400 text-sm">Click load to fetch timing data</div>
+                    <div id="ttc-data" class="space-y-2 hidden"></div>
+                    <button onclick="loadTimeToClick()" class="mt-4 btn-primary px-4 py-2 rounded-lg text-sm"><i class="fas fa-sync-alt mr-2"></i>Load Timing</button>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-lg font-bold mb-4"><i class="fas fa-user-secret mr-2 text-red-400"></i>Repeat Victims</h3>
+                    <div id="rv-loading" class="text-gray-400 text-sm">Click load to detect repeat victims</div>
+                    <div id="rv-data" class="space-y-2 max-h-64 overflow-y-auto hidden"></div>
+                    <button onclick="loadRepeatVictims()" class="mt-4 btn-primary px-4 py-2 rounded-lg text-sm"><i class="fas fa-sync-alt mr-2"></i>Detect</button>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-lg font-bold mb-4"><i class="fas fa-filter mr-2 text-green-400"></i>Campaign Filters</h3>
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <select id="filter-status" class="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm"><option value="">Any Status</option><option>draft</option><option>running</option><option>paused</option><option>completed</option><option>cancelled</option></select>
+                        <input id="filter-template" type="number" placeholder="Template ID" class="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm">
+                        <input id="filter-group" type="number" placeholder="Group ID" class="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm">
+                        <input id="filter-smtp" type="number" placeholder="SMTP ID" class="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div id="filter-data" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                    <button onclick="loadCampaignFilters()" class="mt-4 btn-primary px-4 py-2 rounded-lg text-sm"><i class="fas fa-search mr-2"></i>Filter</button>
+                </div>
+            </div>`;
+    }
+
+    async function loadHeatmap() {
+        const data = await api('/api/analytics/heatmap') || {points: []};
+        const container = document.getElementById('heatmap-data');
+        document.getElementById('heatmap-loading').classList.add('hidden');
+        container.classList.remove('hidden');
+        if (!data.points.length) {
+            container.innerHTML = '<p class="text-gray-400 text-sm">No location data yet.</p>';
+            return;
+        }
+        container.innerHTML = data.points.map(p => `
+            <div class="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                <span>${p.country}</span>
+                <span class="text-sm text-gray-400">${p.intensity} events</span>
+            </div>
+        `).join('');
+    }
+
+    async function loadTimeToClick() {
+        const data = await api('/api/analytics/time-to-click') || {};
+        const container = document.getElementById('ttc-data');
+        document.getElementById('ttc-loading').classList.add('hidden');
+        container.classList.remove('hidden');
+        container.innerHTML = `
+            <div class="grid grid-cols-3 gap-3 text-center">
+                <div class="bg-white/5 p-3 rounded-lg"><div class="text-lg font-bold text-blue-400">${formatSeconds(data.open_times?.avg || 0)}</div><div class="text-xs text-gray-400">Avg Open</div></div>
+                <div class="bg-white/5 p-3 rounded-lg"><div class="text-lg font-bold text-green-400">${formatSeconds(data.click_times?.avg || 0)}</div><div class="text-xs text-gray-400">Avg Click</div></div>
+                <div class="bg-white/5 p-3 rounded-lg"><div class="text-lg font-bold text-red-400">${formatSeconds(data.submit_times?.avg || 0)}</div><div class="text-xs text-gray-400">Avg Submit</div></div>
+            </div>`;
+    }
+
+    function formatSeconds(s) {
+        if (s < 60) return Math.round(s) + 's';
+        if (s < 3600) return Math.round(s/60) + 'm';
+        return Math.round(s/3600) + 'h';
+    }
+
+    async function loadRepeatVictims() {
+        const data = await api('/api/analytics/repeat-victims') || {repeat_victims: []};
+        const container = document.getElementById('rv-data');
+        document.getElementById('rv-loading').classList.add('hidden');
+        container.classList.remove('hidden');
+        if (!data.repeat_victims.length) {
+            container.innerHTML = '<p class="text-gray-400 text-sm">No repeat victims detected.</p>';
+            return;
+        }
+        container.innerHTML = data.repeat_victims.map(v => `
+            <div class="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                <div><div class="font-medium">${v.email}</div><div class="text-xs text-gray-400">${v.name}</div></div>
+                <span class="text-sm">${v.campaigns_affected} campaigns</span>
+            </div>
+        `).join('');
+    }
+
+    async function loadCampaignFilters() {
+        const params = new URLSearchParams();
+        const status = document.getElementById('filter-status').value;
+        const template = document.getElementById('filter-template').value;
+        const group = document.getElementById('filter-group').value;
+        const smtp = document.getElementById('filter-smtp').value;
+        if (status) params.append('status', status);
+        if (template) params.append('template_id', template);
+        if (group) params.append('group_id', group);
+        if (smtp) params.append('smtp_id', smtp);
+        const data = await api('/api/analytics/campaigns/filter?' + params.toString()) || [];
+        const container = document.getElementById('filter-data');
+        if (!data.length) {
+            container.innerHTML = '<p class="text-gray-400 text-sm">No campaigns match.</p>';
+            return;
+        }
+        container.innerHTML = data.map(c => `
+            <div class="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                <span>${c.name}</span>
+                <span class="text-xs px-2 py-1 rounded ${c.status === 'running' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}">${c.status}</span>
+            </div>
+        `).join('');
+    }
+
+    // ========== TOOLS ==========
+    async function renderTools(el) {
+        el.innerHTML = `
+            <div class="flex items-center justify-between mb-8">
+                <div><h2 class="text-2xl md:text-3xl font-bold">Tools</h2><p class="text-gray-400 mt-1">Email validation, webhooks, and payload delivery</p></div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-lg font-bold mb-4"><i class="fas fa-check-circle mr-2 text-green-400"></i>Email Validation</h3>
+                    <input id="validate-email-input" placeholder="email@example.com" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 mb-3">
+                    <button onclick="validateEmail()" class="btn-primary px-4 py-2 rounded-lg text-sm"><i class="fas fa-search mr-2"></i>Validate</button>
+                    <div id="validate-result" class="mt-4 hidden"></div>
+                </div>
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-lg font-bold mb-4"><i class="fas fa-bell mr-2 text-yellow-400"></i>Webhooks</h3>
+                    <div id="webhooks-list" class="space-y-2 max-h-48 overflow-y-auto mb-4"></div>
+                    <button onclick="showCreateWebhook()" class="btn-primary px-4 py-2 rounded-lg text-sm"><i class="fas fa-plus mr-2"></i>New Webhook</button>
+                </div>
+                <div class="glass rounded-xl p-6 lg:col-span-2">
+                    <h3 class="text-lg font-bold mb-4"><i class="fas fa-file-arrow-down mr-2 text-purple-400"></i>Payload Delivery</h3>
+                    <div class="flex gap-3 mb-4">
+                        <input id="payload-name" placeholder="Payload name" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 flex-1">
+                        <input id="payload-file" type="file" class="bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-sm flex-1">
+                        <button onclick="uploadPayload()" class="btn-primary px-4 py-2 rounded-lg text-sm"><i class="fas fa-upload mr-2"></i>Upload</button>
+                    </div>
+                    <div id="payloads-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
+                </div>
+            </div>`;
+        loadWebhooks();
+        loadPayloads();
+    }
+
+    async function validateEmail() {
+        const email = document.getElementById('validate-email-input').value;
+        if (!email) return;
+        const result = await api('/api/validate/email?email=' + encodeURIComponent(email) + '&check_mx=true');
+        const el = document.getElementById('validate-result');
+        el.classList.remove('hidden');
+        el.innerHTML = `
+            <div class="p-3 rounded-lg ${result.valid ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
+                <div class="font-bold">${result.valid ? 'Valid' : 'Invalid'}</div>
+                <div class="text-sm">${result.reason}</div>
+                <div class="text-xs mt-1 text-gray-400">Syntax: ${result.syntax} | MX: ${result.mx_valid} | Disposable: ${result.disposable}</div>
+            </div>`;
+    }
+
+    async function loadWebhooks() {
+        const list = document.getElementById('webhooks-list');
+        if (!list) return;
+        const hooks = await api('/api/webhooks') || [];
+        if (!hooks.length) {
+            list.innerHTML = '<p class="text-gray-400 text-sm">No webhooks configured.</p>';
+            return;
+        }
+        list.innerHTML = hooks.map(h => `
+            <div class="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                <div><div class="font-medium">${h.name}</div><div class="text-xs text-gray-400">${h.provider} — ${h.events.join(', ')}</div></div>
+                <button onclick="deleteWebhook(${h.id})" class="text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
+            </div>
+        `).join('');
+    }
+
+    async function deleteWebhook(id) {
+        if (!confirm('Delete webhook?')) return;
+        await api('/api/webhooks/' + id, 'DELETE');
+        loadWebhooks();
+        toast('Webhook deleted', 'info');
+    }
+
+    function showCreateWebhook() {
+        showModal('New Webhook', `
+            <form onsubmit="createWebhook(event)" class="space-y-4">
+                <input id="wh-name" placeholder="Webhook Name" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                <input id="wh-url" placeholder="https://hooks.slack.com/services/..." class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5" required>
+                <select id="wh-provider" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5 text-white">
+                    <option value="slack">Slack</option>
+                    <option value="discord">Discord</option>
+                    <option value="generic">Generic</option>
+                </select>
+                <input id="wh-events" placeholder="Events: open,click,submit" value="open,click,submit" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2.5">
+                <button type="submit" class="w-full btn-primary py-2.5 rounded-lg"><i class="fas fa-plus mr-2"></i>Create Webhook</button>
+            </form>`);
+    }
+
+    async function createWebhook(e) {
+        e.preventDefault();
+        const data = {
+            name: document.getElementById('wh-name').value,
+            url: document.getElementById('wh-url').value,
+            provider: document.getElementById('wh-provider').value,
+            events: document.getElementById('wh-events').value.split(',').map(s => s.trim()),
+        };
+        await api('/api/webhooks', 'POST', data);
+        document.getElementById('modal').remove();
+        loadWebhooks();
+        toast('Webhook created', 'success');
+    }
+
+    async function loadPayloads() {
+        const list = document.getElementById('payloads-list');
+        if (!list) return;
+        const payloads = await api('/api/payloads') || [];
+        if (!payloads.length) {
+            list.innerHTML = '<p class="text-gray-400 text-sm">No payloads uploaded.</p>';
+            return;
+        }
+        list.innerHTML = payloads.map(p => `
+            <div class="flex justify-between items-center p-3 bg-white/5 rounded-lg">
+                <div><div class="font-medium">${p.name}</div><div class="text-xs text-gray-400">${p.filename} — ${p.size} bytes — ${p.download_count} downloads</div></div>
+                <div class="flex gap-2">
+                    <a href="${p.download_url}" target="_blank" class="text-blue-400 hover:text-blue-300 text-sm"><i class="fas fa-download"></i></a>
+                    <button onclick="deletePayload(${p.id})" class="text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function uploadPayload() {
+        const fileInput = document.getElementById('payload-file');
+        const nameInput = document.getElementById('payload-name');
+        if (!fileInput.files.length) return;
+        const form = new FormData();
+        form.append('file', fileInput.files[0]);
+        form.append('name', nameInput.value || fileInput.files[0].name);
+        const resp = await fetch(API + '/api/payloads/upload', {method: 'POST', body: form});
+        if (resp.ok) {
+            nameInput.value = '';
+            fileInput.value = '';
+            loadPayloads();
+            toast('Payload uploaded', 'success');
+        } else {
+            toast('Upload failed', 'error');
+        }
+    }
+
+    async function deletePayload(id) {
+        if (!confirm('Delete payload?')) return;
+        await api('/api/payloads/' + id, 'DELETE');
+        loadPayloads();
+        toast('Payload deleted', 'info');
     }
 
     // ========== INTEGRATIONS ==========

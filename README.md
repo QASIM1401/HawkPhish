@@ -69,6 +69,11 @@ Everything runs locally with a lightweight **FastAPI** backend, **SQLite** datab
 | 📡 **Tracking** | Pixel tracking for opens, link tracking for clicks, credential capture, and full session timelines. |
 | 📄 **Reports** | Download per-campaign or dashboard summary PDFs, JSON, and CSV exports. |
 | 📋 **Audit Logs** | Every action logged with timestamps for compliance and review. |
+| 📈 **Analytics** | Geolocation heatmap, time-to-click analytics, repeat-victim detection, and advanced campaign filters. |
+| 🛠️ **Tools** | Email validation engine, webhook notifications (Slack/Discord/generic), and custom payload delivery. |
+| 🖼️ **Screenshots** | Capture landing page screenshots and preview emails in a 600px client wrapper. |
+| 🗄️ **Multi-Database** | SQLite by default; switch to PostgreSQL or MySQL via `DATABASE_URL`. |
+| 🔐 **HTTPS/TLS** | Optional SSL certificate support for production deployments. |
 | 🔧 **Built-in SMTP Server** | Raw SMTP server for receiving and relaying emails directly. |
 | 🔒 **Ethical First** | Built-in warnings and "Authorized Use Only" branding. |
 
@@ -81,6 +86,8 @@ Everything runs locally with a lightweight **FastAPI** backend, **SQLite** datab
   ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
   ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
   ![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+  ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+  ![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
   ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
   ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
   ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
@@ -90,9 +97,10 @@ Everything runs locally with a lightweight **FastAPI** backend, **SQLite** datab
 **Backend**
 
 - FastAPI (async Python)
-- SQLAlchemy 2.0 + aiosqlite
+- SQLAlchemy 2.0 + aiosqlite / asyncpg / aiomysql
 - aiosmtplib, email-validator, Jinja2
 - reportlab (PDF reports), Pillow + qrcode
+- Playwright (landing page screenshots)
 
 **Frontend**
 
@@ -390,6 +398,25 @@ If you want to track an **external landing page** (not hosted on HawkPhish):
 
 ---
 
+### Step 6 — Email Validation & Anti-Detection Headers
+
+HawkPhish includes a built-in **Email Validation Engine** to clean your recipient lists before sending:
+
+1. Go to **Tools** in the sidebar.
+2. Under **Email Validation**, enter an email and click **Validate**.
+3. The engine checks:
+   - Syntax validity
+   - Disposable/throwaway domains
+   - Role-based addresses (`admin@`, `info@`, etc.)
+   - MX record existence
+   - SMTP deliverability (optional)
+
+Use the bulk API endpoint `/api/validate/bulk` to validate lists programmatically.
+
+Every email sent by HawkPhish also includes **anti-detection headers** (randomized User-Agent, Message-ID, X-Priority, and Mailer) to reduce fingerprinting by mail filters.
+
+---
+
 ### Step 8 — Monitor & Track Results
 
 **Dashboard:**
@@ -488,6 +515,70 @@ http://proxy3.com:3128
 1. Go to **Campaigns**.
 2. Click **Timeline** on any campaign.
 3. See every recipient's journey: sent → opened → clicked → submitted.
+
+---
+
+### Step 13 — Analytics
+
+Go to **Analytics** in the sidebar for deeper campaign intelligence:
+
+- **Geolocation Heatmap** — see which countries/cities interact most with your campaigns.
+- **Time-to-Click** — average time between sent → opened, sent → clicked, and sent → submitted.
+- **Repeat Victims** — detect recipients who fell for multiple campaigns.
+- **Advanced Campaign Filters** — filter campaigns by status, template, group, or SMTP config.
+
+---
+
+### Step 14 — Tools (Webhooks & Payloads)
+
+The **Tools** page centralizes three power features:
+
+**Webhooks**
+1. Enter a webhook URL (Slack, Discord, or generic).
+2. Choose events: `open`, `click`, `submit`.
+3. HawkPhish POSTs formatted notifications in real time as recipients interact.
+
+**Payload Delivery**
+1. Upload any file (documents, scripts, samples, etc.).
+2. HawkPhish creates a tracked download URL (`/payloads/{token}/download`).
+3. Include the URL in emails; downloads are counted and logged.
+
+---
+
+### Step 15 — Landing Page Screenshots & Email Previews
+
+- In **Landing Pages**, click **Screenshot** on any page to capture a full-page PNG via Playwright.
+- In **Email Templates**, click **Email Client Preview** while editing to render your HTML inside a 600px email-client wrapper.
+
+---
+
+### Step 16 — Production Database & HTTPS
+
+**Switch to PostgreSQL or MySQL:**
+
+Set the `DATABASE_URL` environment variable before starting the server:
+
+```bash
+# PostgreSQL
+set DATABASE_URL=postgresql+asyncpg://user:pass@localhost/hawkphish
+
+# MySQL
+set DATABASE_URL=mysql+aiomysql://user:pass@localhost/hawkphish
+```
+
+If `DATABASE_URL` is not set, HawkPhish defaults to SQLite (`backend/hawkphish.db`).
+
+**Enable HTTPS/TLS:**
+
+Provide a certificate and key, then start the server:
+
+```bash
+set SSL_CERT_FILE=server.crt
+set SSL_KEY_FILE=server.key
+python main.py
+```
+
+The server will serve over `https://0.0.0.0:8000`.
 
 ---
 
@@ -604,6 +695,42 @@ HawkPhish exposes a full REST API. For interactive documentation, visit `/docs` 
 |--------|----------|-------------|
 | GET | `/api/audit-logs` | List logs |
 | GET | `/api/audit-logs/stats` | Statistics |
+
+### Email Validation
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/validate/email` | Validate a single email |
+| POST | `/api/validate/bulk` | Validate multiple emails |
+| GET | `/api/validate/check-disposable` | Check disposable domain |
+| GET | `/api/validate/check-role` | Check role-based address |
+
+### Webhooks
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/webhooks` | List / create webhooks |
+| DELETE | `/api/webhooks/{id}` | Delete webhook |
+
+### Payload Delivery
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/POST | `/api/payloads/upload` | Upload a payload file |
+| GET | `/api/payloads` | List payloads |
+| GET | `/payloads/{token}/download` | Download payload (tracked) |
+| DELETE | `/api/payloads/{id}` | Delete payload |
+
+### Screenshots & Previews
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/screenshots/landing-page/{id}` | Screenshot a landing page |
+| POST | `/api/screenshots/email-preview` | Email client preview wrapper |
+
+### Analytics
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/analytics/heatmap` | Geolocation heatmap |
+| GET | `/api/analytics/time-to-click` | Time-to-click statistics |
+| GET | `/api/analytics/repeat-victims` | Repeat victim detection |
+| GET | `/api/analytics/campaigns/filter` | Advanced campaign filtering |
 
 ---
 

@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models import EmailLog, Campaign, CredentialSubmit, RecipientSession
+from services.webhook_service import trigger_webhooks
 
 TRACKING_PIXEL = base64.b64decode(
     "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
@@ -148,6 +149,32 @@ class TrackingService:
             if c and c not in session.countries:
                 session.countries.append(c)
 
+    async def _notify_webhook(self, event: str, log: EmailLog, extra: dict = None):
+        try:
+            campaign = await self.db.get(Campaign, log.campaign_id) if log.campaign_id else None
+            recipient = None
+            if log.recipient_id:
+                from models import Recipient
+                recipient = await self.db.get(Recipient, log.recipient_id)
+            data = {
+                "campaign_id": log.campaign_id,
+                "campaign_name": campaign.name if campaign else "",
+                "recipient_id": log.recipient_id,
+                "email": recipient.email if recipient else log.email or "",
+                "name": f"{recipient.first_name or ''} {recipient.last_name or ''}".strip() if recipient else "",
+                "ip_address": log.ip_address,
+                "country": log.country,
+                "city": log.city,
+                "browser": log.browser,
+                "os": log.os,
+                "device": log.device,
+            }
+            if extra:
+                data.update(extra)
+            await trigger_webhooks(self.db, event, data)
+        except Exception:
+            pass
+
     async def record_open(self, tracking_id: str, user_agent: str = "", ip_address: str = "", language: str = "", referrer: str = ""):
         result = await self.db.execute(
             select(EmailLog).where(EmailLog.tracking_id == tracking_id)
@@ -196,6 +223,8 @@ class TrackingService:
         session.status = "opened"
 
         await self.db.commit()
+        if not log.opened_at or log.open_count <= 1:
+            await self._notify_webhook("open", log)
 
     async def record_click(self, tracking_id: str, user_agent: str = "", ip_address: str = "", language: str = "", referrer: str = "") -> str:
         result = await self.db.execute(
@@ -245,6 +274,8 @@ class TrackingService:
         session.status = "clicked"
 
         await self.db.commit()
+        if not log.clicked_at or log.click_count <= 1:
+            await self._notify_webhook("click", log)
 
         campaign = await self.db.get(Campaign, log.campaign_id)
         if campaign and campaign.landing_page_id:
@@ -309,6 +340,7 @@ class TrackingService:
         session.status = "submitted"
 
         await self.db.commit()
+        await self._notify_webhook("submit", log, {"captured_fields": list(data.keys()) if data else []})
 
     def get_pixel(self) -> bytes:
         return TRACKING_PIXEL

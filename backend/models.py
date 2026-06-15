@@ -248,3 +248,28 @@ class AuditLog(Base):
     details = Column(JSON, default=dict)
     ip_address = Column(String(45))
     success = Column(Boolean, default=True)
+
+
+class Webhook(Base):
+    __tablename__ = "webhooks"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    url = Column(String(500), nullable=False)
+    provider = Column(String(20), default="generic")  # slack, discord, generic
+    events = Column(JSON, default=list)  # ["open", "click", "submit", "campaign_start"]
+    secret = Column(String(255))  # Optional signature secret
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Payload(Base):
+    __tablename__ = "payloads"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    filename = Column(String(255))
+    content_type = Column(String(100))
+    size = Column(Integer)
+    tracking_token = Column(String(50), unique=True)
+    download_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+

@@ -61,6 +61,33 @@ def explain_smtp_error(exc: Exception) -> str:
     return f"SMTP Error: {msg}"
 
 
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
+]
+
+MAILERS = [
+    "Microsoft Outlook 16.0",
+    "Apple Mail (2.0)",
+    "Mozilla Thunderbird 115.0",
+    "Microsoft Office Outlook 12.0",
+]
+
+
+def add_anti_detection_headers(msg: MIMEMultipart, domain: str):
+    """Add randomized headers to avoid pattern detection by spam filters."""
+    msg['X-Mailer'] = random.choice(MAILERS)
+    msg['User-Agent'] = random.choice(USER_AGENTS)
+    msg['X-Priority'] = random.choice(['1', '2', '3'])
+    msg['Importance'] = random.choice(['High', 'Normal', 'Low'])
+    msg['X-MSMail-Priority'] = random.choice(['High', 'Normal', 'Low'])
+    # Random threading ID format
+    msg['X-Mailgun-Variables'] = json.dumps({"campaign_id": hashlib.md5(domain.encode()).hexdigest()[:8]})
+    msg['X-Campaign-ID'] = hashlib.sha256(f"{domain}{time.time()}".encode()).hexdigest()[:16]
+
+
 def add_senderpy_headers(msg: MIMEMultipart, domain: str, username: str, spoof_from: str = None):
     """Full sender.py authentication header injection for maximum deliverability."""
     # Message-ID
@@ -86,7 +113,6 @@ def add_senderpy_headers(msg: MIMEMultipart, domain: str, username: str, spoof_f
     msg['X-Spam-Level'] = ""
     msg['X-Spam-Checker-Version'] = "SpamAssassin 3.4.0"
     # Email client headers (Microsoft Outlook)
-    msg['X-Mailer'] = 'Microsoft Outlook 16.0'
     msg['X-MimeOLE'] = 'Produced By Microsoft MimeOLE V6.00.2800.1441'
     msg['X-MS-Exchange-Organization-AuthAs'] = 'Internal'
     msg['X-MS-Exchange-Organization-AuthSource'] = 'Office365'
@@ -98,6 +124,8 @@ def add_senderpy_headers(msg: MIMEMultipart, domain: str, username: str, spoof_f
     # List management
     msg['List-Unsubscribe'] = f'<mailto:unsubscribe@{domain}>, <https://{domain}/unsubscribe>'
     msg['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
+    # Anti-detection randomization
+    add_anti_detection_headers(msg, domain)
     # Return path
     msg['Return-Path'] = username
     # Spoof tracking
