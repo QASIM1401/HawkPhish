@@ -21,7 +21,7 @@ class CampaignManager:
         self.db = db
         self.smtp_sender = SMTPSender()
         self.template_engine = TemplateEngine()
-        self._running_campaigns = {}
+        self._stop_events = {}
 
     async def create_campaign(self, data: dict) -> Campaign:
         campaign = Campaign(
@@ -58,20 +58,26 @@ class CampaignManager:
         campaign.started_at = datetime.utcnow()
         await self.db.commit()
 
+        # Signal any previous run to stop, then create a fresh stop event
+        old_event = self._stop_events.get(campaign_id)
+        if old_event and not old_event.is_set():
+            old_event.set()
+        self._stop_events[campaign_id] = asyncio.Event()
+
         await log_action(self.db, "campaign_started", "campaign", campaign_id, "system", {"name": campaign.name})
-        asyncio.create_task(self._process_campaign_background(campaign_id))
+        asyncio.create_task(self._process_campaign_background(campaign_id, self._stop_events[campaign_id]))
         return {"message": "Campaign started"}
 
-    async def _process_campaign_background(self, campaign_id: int):
+    async def _process_campaign_background(self, campaign_id: int, stop_event: asyncio.Event):
         """Run campaign processing with a fresh database session."""
         from database import async_session
         async with async_session() as db:
-            await self._process_campaign_with_db(campaign_id, db)
+            await self._process_campaign_with_db(campaign_id, db, stop_event)
 
-    async def _process_campaign_with_db(self, campaign_id: int, db: AsyncSession):
+    async def _process_campaign_with_db(self, campaign_id: int, db: AsyncSession, stop_event: asyncio.Event):
         """Process campaign using the provided database session."""
         self.db = db
-        await self._process_campaign(campaign_id)
+        await self._process_campaign(campaign_id, stop_event)
 
     async def pause_campaign(self, campaign_id: int):
         campaign = await self.db.get(Campaign, campaign_id)
@@ -79,7 +85,9 @@ class CampaignManager:
             return {"error": "Campaign is not running"}
         campaign.status = "paused"
         await self.db.commit()
-        self._running_campaigns.pop(campaign_id, None)
+        event = self._stop_events.get(campaign_id)
+        if event:
+            event.set()
         await log_action(self.db, "campaign_paused", "campaign", campaign_id, "system", {"name": campaign.name})
         return {"message": "Campaign paused"}
 
@@ -89,18 +97,25 @@ class CampaignManager:
             return {"error": "Campaign not found"}
         campaign.status = "cancelled"
         await self.db.commit()
-        self._running_campaigns.pop(campaign_id, None)
+        event = self._stop_events.get(campaign_id)
+        if event:
+            event.set()
         await log_action(self.db, "campaign_cancelled", "campaign", campaign_id, "system", {"name": campaign.name})
         return {"message": "Campaign cancelled"}
 
-    async def _process_campaign(self, campaign_id: int):
-        self._running_campaigns[campaign_id] = True
-
+    async def _process_campaign(self, campaign_id: int, stop_event: asyncio.Event):
         campaign = await self.db.get(Campaign, campaign_id)
+        if not campaign:
+            return
         template = await self.db.get(EmailTemplate, campaign.template_id)
         smtp = await self.db.get(SMTPConfig, campaign.smtp_id)
         group = await self.db.get(Group, campaign.group_id)
         landing_page = await self.db.get(LandingPage, campaign.landing_page_id) if campaign.landing_page_id else None
+
+        if not all([template, smtp, group]):
+            campaign.status = "failed"
+            await self.db.commit()
+            return
 
         proxies = []
         if campaign.use_proxies:
@@ -117,7 +132,7 @@ class CampaignManager:
         settings = campaign.settings or {}
         min_delay = settings.get("min_delay", 2)
         max_delay = settings.get("max_delay", 8)
-        max_per_smtp = smtp.max_emails - smtp.emails_sent
+        max_per_smtp = max(0, smtp.max_emails - smtp.emails_sent)
 
         # Load rotation data
         subjects = [s.strip() for s in template.subject.split(";") if s.strip()] if ";" in template.subject else [template.subject]
@@ -136,7 +151,7 @@ class CampaignManager:
         proxy_index = campaign.proxy_index or 0
         sent_count = 0
         for i, recipient in enumerate(recipients):
-            if campaign_id not in self._running_campaigns:
+            if stop_event.is_set():
                 break
             if sent_count >= max_per_smtp:
                 break
@@ -284,10 +299,11 @@ class CampaignManager:
             await asyncio.sleep(random.uniform(min_delay, max_delay))
 
         campaign.proxy_index = proxy_index
-        campaign.status = "completed"
-        campaign.completed_at = datetime.utcnow()
+        # Only mark completed if the campaign wasn't paused/cancelled mid-run
+        if not stop_event.is_set():
+            campaign.status = "completed"
+            campaign.completed_at = datetime.utcnow()
         await self.db.commit()
-        self._running_campaigns.pop(campaign_id, None)
 
     async def get_stats(self, campaign_id: int) -> dict:
         campaign = await self.db.get(Campaign, campaign_id)

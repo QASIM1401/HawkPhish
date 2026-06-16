@@ -56,7 +56,7 @@ async def update_webhook(hook_id: int, data: WebhookCreate, db: AsyncSession = D
     hook = await db.get(Webhook, hook_id)
     if not hook:
         raise HTTPException(404, "Webhook not found")
-    for k, v in data.model_dump().items():
+    for k, v in data.model_dump(exclude_unset=True).items():
         setattr(hook, k, v)
     await db.commit()
     return {"message": "Webhook updated"}

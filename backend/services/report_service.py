@@ -236,6 +236,9 @@ def generate_campaign_report(campaign: Dict, emails: List[Dict], recipients: Lis
     bounced = campaign.get("total_bounced", 0)
     failed = campaign.get("total_failed", 0)
 
+    def _rate(numer, denom=total):
+        return round((numer / denom * 100), 1) if denom > 0 else 0.0
+
     # Stats cards row
     cards = [
         _make_stat_card("Emails Sent", total, BRAND["info"]),
@@ -257,14 +260,14 @@ def generate_campaign_report(campaign: Dict, emails: List[Dict], recipients: Lis
     rates_data = [
         ["Metric", "Count", "Rate", "Status"],
         ["Emails Sent", str(campaign.get("total_sent", 0)), "100%", "---"],
-        ["Opened", str(opened), f"{(opened/campaign.get('total_sent',1)*100):.1f}%",
-         "CRITICAL" if opened/campaign.get('total_sent',1) > 0.5 else "HIGH" if opened/campaign.get('total_sent',1) > 0.3 else "MEDIUM"],
-        ["Clicked", str(clicked), f"{(clicked/campaign.get('total_sent',1)*100):.1f}%",
-         "CRITICAL" if clicked/campaign.get('total_sent',1) > 0.3 else "HIGH" if clicked/campaign.get('total_sent',1) > 0.15 else "MEDIUM"],
-        ["Credentials Captured", str(submitted), f"{(submitted/campaign.get('total_sent',1)*100):.1f}%",
+        ["Opened", str(opened), f"{_rate(opened)}%",
+         "CRITICAL" if _rate(opened) > 50 else "HIGH" if _rate(opened) > 30 else "MEDIUM"],
+        ["Clicked", str(clicked), f"{_rate(clicked)}%",
+         "CRITICAL" if _rate(clicked) > 30 else "HIGH" if _rate(clicked) > 15 else "MEDIUM"],
+        ["Credentials Captured", str(submitted), f"{_rate(submitted)}%",
          "CRITICAL" if submitted > 0 else "NONE"],
-        ["Bounced", str(bounced), f"{(bounced/campaign.get('total_sent',1)*100):.1f}%", "---"],
-        ["Failed", str(failed), f"{(failed/campaign.get('total_sent',1)*100):.1f}%", "---"],
+        ["Bounced", str(bounced), f"{_rate(bounced)}%", "---"],
+        ["Failed", str(failed), f"{_rate(failed)}%", "---"],
     ]
 
     status_colors = {"CRITICAL": BRAND["danger"], "HIGH": BRAND["warning"], "MEDIUM": BRAND["info"], "LOW": BRAND["success"], "NONE": BRAND["text_light"], "---": BRAND["text_light"]}
@@ -336,7 +339,7 @@ def generate_campaign_report(campaign: Dict, emails: List[Dict], recipients: Lis
     if clicked > 0:
         recs.append("Provide phishing awareness training for all users who clicked")
         recs.append("Review and strengthen email filtering rules")
-    if opened / campaign.get('total_sent', 1) > 0.4:
+    if _rate(opened) > 40:
         recs.append("Implement stricter email security controls (DMARC, DKIM, SPF)")
     if not recs:
         recs.append("Continue regular phishing simulations to maintain security posture")

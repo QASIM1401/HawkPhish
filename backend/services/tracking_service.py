@@ -160,7 +160,7 @@ class TrackingService:
                 "campaign_id": log.campaign_id,
                 "campaign_name": campaign.name if campaign else "",
                 "recipient_id": log.recipient_id,
-                "email": recipient.email if recipient else log.email or "",
+                "email": recipient.email if recipient else "",
                 "name": f"{recipient.first_name or ''} {recipient.last_name or ''}".strip() if recipient else "",
                 "ip_address": log.ip_address,
                 "country": log.country,

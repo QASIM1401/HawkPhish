@@ -121,13 +121,16 @@ async def download_campaign_pdf(campaign_id: int, db: AsyncSession = Depends(get
         raise HTTPException(404, "Campaign not found")
     result = await db.execute(select(EmailLog).where(EmailLog.campaign_id == campaign_id))
     emails = result.scalars().all()
-    email_dicts = [{
-        "email": (await db.get(campaign.__class__, e.campaign_id) and "") or "",
-        "status": e.status,
-        "opened_at": e.opened_at.isoformat() if e.opened_at else None,
-        "clicked_at": e.clicked_at.isoformat() if e.clicked_at else None,
-        "submitted_at": e.submitted_at.isoformat() if e.submitted_at else None,
-    } for e in emails]
+    email_dicts = []
+    for e in emails:
+        recipient = await db.get(Recipient, e.recipient_id) if e.recipient_id else None
+        email_dicts.append({
+            "email": recipient.email if recipient else "",
+            "status": e.status,
+            "opened_at": e.opened_at.isoformat() if e.opened_at else None,
+            "clicked_at": e.clicked_at.isoformat() if e.clicked_at else None,
+            "submitted_at": e.submitted_at.isoformat() if e.submitted_at else None,
+        })
     campaign_dict = {
         "name": campaign.name,
         "status": campaign.status,
@@ -154,14 +157,17 @@ async def download_campaign_json(campaign_id: int, db: AsyncSession = Depends(ge
         raise HTTPException(404, "Campaign not found")
     result = await db.execute(select(EmailLog).where(EmailLog.campaign_id == campaign_id))
     emails = result.scalars().all()
-    email_dicts = [{
-        "email": (await db.get(Recipient, e.recipient_id)).email if await db.get(Recipient, e.recipient_id) else "",
-        "status": e.status,
-        "opened_at": e.opened_at.isoformat() if e.opened_at else None,
-        "clicked_at": e.clicked_at.isoformat() if e.clicked_at else None,
-        "submitted_at": e.submitted_at.isoformat() if e.submitted_at else None,
-        "error": e.error_message,
-    } for e in emails]
+    email_dicts = []
+    for e in emails:
+        recipient = await db.get(Recipient, e.recipient_id) if e.recipient_id else None
+        email_dicts.append({
+            "email": recipient.email if recipient else "",
+            "status": e.status,
+            "opened_at": e.opened_at.isoformat() if e.opened_at else None,
+            "clicked_at": e.clicked_at.isoformat() if e.clicked_at else None,
+            "submitted_at": e.submitted_at.isoformat() if e.submitted_at else None,
+            "error": e.error_message,
+        })
     campaign_dict = {
         "name": campaign.name,
         "status": campaign.status,
@@ -188,17 +194,21 @@ async def download_campaign_csv(campaign_id: int, db: AsyncSession = Depends(get
         raise HTTPException(404, "Campaign not found")
     result = await db.execute(select(EmailLog).where(EmailLog.campaign_id == campaign_id))
     emails = result.scalars().all()
-    email_dicts = [{
-        "email": (await db.get(Recipient, e.recipient_id)).email if await db.get(Recipient, e.recipient_id) else "",
-        "status": e.status,
-        "opened_at": e.opened_at.isoformat() if e.opened_at else None,
-        "clicked_at": e.clicked_at.isoformat() if e.clicked_at else None,
-        "submitted_at": e.submitted_at.isoformat() if e.submitted_at else None,
-        "error": e.error_message,
-    } for e in emails]
+    email_dicts = []
+    for e in emails:
+        recipient = await db.get(Recipient, e.recipient_id) if e.recipient_id else None
+        email_dicts.append({
+            "email": recipient.email if recipient else "",
+            "status": e.status,
+            "opened_at": e.opened_at.isoformat() if e.opened_at else None,
+            "clicked_at": e.clicked_at.isoformat() if e.clicked_at else None,
+            "submitted_at": e.submitted_at.isoformat() if e.submitted_at else None,
+            "error": e.error_message,
+        })
+    smtp_config = await db.get(SMTPConfig, campaign.smtp_id) if campaign.smtp_id else None
     campaign_dict = {
         "name": campaign.name,
-        "from_email": (await db.get(SMTPConfig, campaign.smtp_id)).from_email if await db.get(SMTPConfig, campaign.smtp_id) else "",
+        "from_email": smtp_config.from_email if smtp_config else "",
     }
     csv_str = generate_campaign_report_csv(campaign_dict, email_dicts)
     return StreamingResponse(
